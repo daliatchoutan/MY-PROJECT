@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The backend for the **Smart Poultry Farm Automation System** is a robust, modular, production-ready RESTful API built using **Node.js**, **Express.js**, and **Sequelize ORM** (supporting MySQL and SQLite). 
+The backend for the **Smart Poultry Farm Automation System** is a robust, modular, production-ready RESTful API built using **Node.js**, **Express.js**, and **Sequelize ORM** connecting to **MySQL in XAMPP**. 
 
 It bridges IoT hardware automation (ESP32 microcontrollers), AI-powered computer vision health detection, multi-farm management, e-commerce marketplace operations, order logistics delivery, and platform-wide administrative governance.
 

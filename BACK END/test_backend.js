@@ -5,8 +5,6 @@ const runTest = async () => {
   
   // Launch backend server in process or require app
   process.env.PORT = 3005;
-  process.env.DB_DIALECT = 'sqlite';
-  process.env.DB_STORAGE = './test_smart_poultry.sqlite';
   
   const app = require('./index.js');
 
