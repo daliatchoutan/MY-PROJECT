@@ -101,7 +101,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'You are browsing as a Visitor. Sign in to place orders in FCFA.',
+                    'You are browsing as a Visitor. Sign in to place orders.',
                     style: TextStyle(fontSize: 12, color: Colors.black87),
                   ),
                 ),

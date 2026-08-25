@@ -63,8 +63,8 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log(' Database connection established successfully.');
 
-    // Sync database models (alter in dev mode)
-    await sequelize.sync({ alter: false });
+    // Sync database models (alter existing tables in dev mode)
+    await sequelize.sync({ alter: true });
     console.log(' Database models synchronized.');
 
     app.listen(port, () => {

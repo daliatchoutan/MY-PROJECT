@@ -175,7 +175,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> with SingleTicker
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Initiate FCFA Payment'),
+          title: const Text('Initiate Payment'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +287,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> with SingleTicker
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.amber,
           tabs: const [
-            Tab(icon: Icon(Icons.storefront), text: 'Products (FCFA)'),
+            Tab(icon: Icon(Icons.storefront), text: 'Products'),
             Tab(icon: Icon(Icons.track_changes), text: 'My Orders & Tracking'),
           ],
         ),

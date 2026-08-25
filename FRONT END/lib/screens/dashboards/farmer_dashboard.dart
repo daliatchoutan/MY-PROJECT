@@ -159,7 +159,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Product to Marketplace (FCFA)'),
+        title: const Text('Add Product to Marketplace'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -339,7 +339,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             Tab(icon: Icon(Icons.agriculture), text: 'Farms'),
             Tab(icon: Icon(Icons.sensors), text: 'Conditions & IoT'),
             Tab(icon: Icon(Icons.warning_amber), text: 'AI Health Alerts'),
-            Tab(icon: Icon(Icons.inventory), text: 'Products (FCFA)'),
+            Tab(icon: Icon(Icons.inventory), text: 'Products'),
             Tab(icon: Icon(Icons.shopping_basket), text: 'Customer Orders'),
           ],
         ),
@@ -584,7 +584,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
         child: const Icon(Icons.add_shopping_cart, color: Colors.white),
       ),
       body: _products.isEmpty
-          ? const Center(child: Text('No inventory products listed in FCFA.'))
+          ? const Center(child: Text('No inventory products listed.'))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _products.length,
