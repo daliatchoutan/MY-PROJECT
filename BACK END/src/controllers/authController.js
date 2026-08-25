@@ -3,7 +3,7 @@ const { User } = require('../models');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role, phone, address } = req.body;
+    const { name, email, password, role, phone, address, avatarUrl } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
@@ -23,7 +23,8 @@ const register = async (req, res, next) => {
       password,
       role: assignedRole,
       phone,
-      address
+      address,
+      avatarUrl
     });
 
     const token = jwt.sign(
@@ -33,13 +34,15 @@ const register = async (req, res, next) => {
     );
 
     return res.status(201).json({
-      message: 'User registered successfully',
+      message: 'User registered successfully on NOVARA',
       token,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        status: user.status,
+        avatarUrl: user.avatarUrl,
         phone: user.phone,
         address: user.address
       }
@@ -62,10 +65,21 @@ const login = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
+    if (user.status === 'suspended') {
+      return res.status(403).json({ message: 'Your NOVARA account is suspended. Please contact support.' });
+    }
+
+    if (user.status === 'blocked') {
+      return res.status(403).json({ message: 'Your NOVARA account has been blocked.' });
+    }
+
     const isValid = await user.validPassword(password);
     if (!isValid) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
+
+    user.lastLoginAt = new Date();
+    await user.save();
 
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
@@ -74,13 +88,15 @@ const login = async (req, res, next) => {
     );
 
     return res.json({
-      message: 'Login successful',
+      message: 'Login successful to NOVARA',
       token,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        status: user.status,
+        avatarUrl: user.avatarUrl,
         phone: user.phone,
         address: user.address
       }
@@ -106,8 +122,42 @@ const getProfile = async (req, res, next) => {
   }
 };
 
+const updateProfile = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const { name, phone, address, avatarUrl } = req.body;
+    if (name) user.name = name;
+    if (phone !== undefined) user.phone = phone;
+    if (address !== undefined) user.address = address;
+    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+
+    await user.save();
+
+    return res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        avatarUrl: user.avatarUrl,
+        phone: user.phone,
+        address: user.address
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
-  getProfile
+  getProfile,
+  updateProfile
 };

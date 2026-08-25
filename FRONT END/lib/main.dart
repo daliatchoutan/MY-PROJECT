@@ -7,11 +7,11 @@ import 'screens/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SmartPoultryApp());
+  runApp(const NovaraApp());
 }
 
-class SmartPoultryApp extends StatelessWidget {
-  const SmartPoultryApp({super.key});
+class NovaraApp extends StatelessWidget {
+  const NovaraApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class SmartPoultryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CartProvider()),
       ],
       child: MaterialApp(
-        title: 'Smart Poultry Farm',
+        title: 'NOVARA Smart Poultry System',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,

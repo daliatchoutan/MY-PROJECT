@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'auth/login_screen.dart';
+import 'welcome_screen.dart';
 import 'dashboards/farmer_dashboard.dart';
 import 'dashboards/customer_dashboard.dart';
 import 'dashboards/delivery_dashboard.dart';
@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen> {
       _navigateToDashboard(auth.role);
     } else {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
       );
     }
   }
@@ -74,28 +74,28 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.egg_alt_rounded,
                 size: 80,
-                color: Colors.green,
+                color: Colors.green.shade800,
               ),
             ),
             const SizedBox(height: 24),
             const Text(
-              'Smart Poultry Farm',
+              'NOVARA',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 28,
+                fontSize: 36,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+                letterSpacing: 2.0,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'IoT Automation & Marketplace System',
+              'Smart Poultry Farm Automation & Marketplace',
               style: TextStyle(
                 color: Colors.white70,
-                fontSize: 16,
+                fontSize: 14,
               ),
             ),
             const SizedBox(height: 48),

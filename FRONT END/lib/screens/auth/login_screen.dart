@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
 
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -67,6 +68,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('NOVARA Sign In'),
+        backgroundColor: Colors.green.shade700,
+        foregroundColor: Colors.white,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -84,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Welcome Back',
+                    'NOVARA Sign In',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 28,
@@ -94,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Sign in to access your poultry farm dashboard',
+                    'Access your poultry farm dashboard, marketplace & orders',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey),
                   ),
@@ -113,11 +119,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_isPasswordVisible,
+                    decoration: InputDecoration(
                       labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
+                      ),
                     ),
                     validator: (val) =>
                         val != null && val.length >= 6 ? null : 'Password must be 6+ chars',

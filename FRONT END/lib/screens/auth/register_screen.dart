@@ -20,6 +20,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _avatarController = TextEditingController();
+  bool _isPasswordVisible = false;
   String _selectedRole = 'Farmer';
 
   final List<String> _roles = ['Farmer', 'Customer', 'Delivery Person', 'Administrator'];
@@ -35,6 +37,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       role: _selectedRole,
       phone: _phoneController.text.trim(),
       address: _addressController.text.trim(),
+      avatarUrl: _avatarController.text.trim(),
     );
 
     if (!mounted) return;
@@ -78,7 +81,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Account'),
+        title: const Text('NOVARA Account Registration'),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
       ),
@@ -91,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Join Smart Poultry Farm',
+                  'Join NOVARA',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -105,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
                 DropdownButtonFormField<String>(
-                  value: _selectedRole,
+                  initialValue: _selectedRole,
                   decoration: const InputDecoration(
                     labelText: 'User Role',
                     prefixIcon: Icon(Icons.badge_outlined),
@@ -145,11 +148,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  obscureText: !_isPasswordVisible,
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    ),
                   ),
                   validator: (val) => val != null && val.length >= 6 ? null : 'Password must be 6+ chars',
                 ),
@@ -170,6 +184,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Location / Address (Optional)',
                     prefixIcon: Icon(Icons.location_on_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _avatarController,
+                  decoration: const InputDecoration(
+                    labelText: 'Profile Avatar Image URL (Optional)',
+                    prefixIcon: Icon(Icons.image_outlined),
                     border: OutlineInputBorder(),
                   ),
                 ),

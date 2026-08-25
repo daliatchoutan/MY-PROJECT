@@ -12,12 +12,24 @@ const Order = sequelize.define('Order', {
     allowNull: false
   },
   totalAmount: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(12, 2),
     allowNull: false
+  },
+  currency: {
+    type: DataTypes.STRING,
+    defaultValue: 'FCFA'
   },
   status: {
     type: DataTypes.ENUM('pending', 'accepted', 'rejected', 'in_transit', 'delivered', 'cancelled'),
     defaultValue: 'pending'
+  },
+  paymentStatus: {
+    type: DataTypes.ENUM('pending', 'paid', 'failed'),
+    defaultValue: 'pending'
+  },
+  paymentMethod: {
+    type: DataTypes.STRING, // e.g., 'MTN Mobile Money', 'Orange Money', 'Credit Card'
+    allowNull: true
   },
   shippingAddress: {
     type: DataTypes.TEXT,

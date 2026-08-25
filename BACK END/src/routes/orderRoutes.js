@@ -6,6 +6,7 @@ const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 router.use(verifyToken);
 
 router.post('/', authorizeRoles('Customer', 'Administrator'), orderController.createOrder);
+router.post('/:id/pay', authorizeRoles('Customer', 'Administrator'), orderController.initiatePayment);
 router.get('/', orderController.getOrders);
 router.put('/:id/status', authorizeRoles('Farmer', 'Administrator'), orderController.updateOrderStatus);
 

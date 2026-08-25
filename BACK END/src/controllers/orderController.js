@@ -59,7 +59,9 @@ const createOrder = async (req, res, next) => {
     const order = await Order.create({
       customerId,
       totalAmount: calculatedTotal,
+      currency: 'FCFA',
       status: 'pending',
+      paymentStatus: 'pending',
       shippingAddress,
       notes
     }, { transaction });
@@ -85,7 +87,7 @@ const createOrder = async (req, res, next) => {
       await Notification.create({
         userId: farmerId,
         title: 'New Order Received',
-        message: `New order #${order.id.substring(0, 8)} placed by customer for your farm products.`,
+        message: `New order #${order.id.substring(0, 8)} placed by customer for your farm products (${calculatedTotal} FCFA).`,
         type: 'order_update'
       });
     }
@@ -101,9 +103,39 @@ const createOrder = async (req, res, next) => {
       ]
     });
 
-    return res.status(201).json({ message: 'Order placed successfully', order: createdOrder });
+    return res.status(201).json({ message: 'Order placed successfully on NOVARA', order: createdOrder });
   } catch (error) {
     if (transaction) await transaction.rollback();
+    next(error);
+  }
+};
+
+const initiatePayment = async (req, res, next) => {
+  try {
+    const { paymentMethod } = req.body; // e.g. 'MTN Mobile Money', 'Orange Money', 'Credit Card'
+    const order = await Order.findByPk(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    if (req.user.role === 'Customer' && order.customerId !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden. You do not own this order.' });
+    }
+
+    order.paymentMethod = paymentMethod || 'MTN Mobile Money';
+    order.paymentStatus = 'paid';
+    await order.save();
+
+    await Notification.create({
+      userId: order.customerId,
+      title: 'Payment Confirmed',
+      message: `Payment of ${order.totalAmount} FCFA for order #${order.id.substring(0, 8)} was successful via ${order.paymentMethod}.`,
+      type: 'order_update'
+    });
+
+    return res.json({ message: 'Payment completed successfully in FCFA', order });
+  } catch (error) {
     next(error);
   }
 };
@@ -172,6 +204,7 @@ const updateOrderStatus = async (req, res, next) => {
 
 module.exports = {
   createOrder,
+  initiatePayment,
   getOrders,
   updateOrderStatus
 };

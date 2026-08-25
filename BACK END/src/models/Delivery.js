@@ -17,8 +17,16 @@ const Delivery = sequelize.define('Delivery', {
     allowNull: true
   },
   status: {
-    type: DataTypes.ENUM('unassigned', 'assigned', 'accepted', 'picked_up', 'delivered', 'failed'),
+    type: DataTypes.ENUM('unassigned', 'assigned', 'accepted', 'picked_up', 'delivered', 'failed', 'delayed'),
     defaultValue: 'unassigned'
+  },
+  isDelayed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  delayReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
   },
   pickupAddress: {
     type: DataTypes.TEXT,
@@ -33,6 +41,10 @@ const Delivery = sequelize.define('Delivery', {
     allowNull: true
   },
   deliveredAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  confirmedAt: {
     type: DataTypes.DATE,
     allowNull: true
   }

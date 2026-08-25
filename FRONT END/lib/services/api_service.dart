@@ -37,6 +37,7 @@ class ApiService {
     required String role,
     String? phone,
     String? address,
+    String? avatarUrl,
   }) async {
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/register'),
@@ -48,6 +49,7 @@ class ApiService {
         'role': role,
         'phone': phone,
         'address': address,
+        'avatarUrl': avatarUrl,
       }),
     );
     return await _processResponse(response);
@@ -57,6 +59,15 @@ class ApiService {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/auth/profile'),
       headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/auth/profile'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode(data),
     );
     return await _processResponse(response);
   }
@@ -125,6 +136,24 @@ class ApiService {
     return await _processResponse(response);
   }
 
+  Future<Map<String, dynamic>> toggleAutoMode(String id, bool autoMode) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/devices/$id/mode'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'autoMode': autoMode}),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> manualOverride(String id, String action) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/devices/$id/override'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'action': action}),
+    );
+    return await _processResponse(response);
+  }
+
   // --- Sensors & Automation ---
   Future<Map<String, dynamic>> getLiveReading(String deviceId) async {
     final response = await http.get(
@@ -144,7 +173,6 @@ class ApiService {
     return data['history'] ?? [];
   }
 
-  // Simulator helper for IoT Telemetry
   Future<Map<String, dynamic>> sendTelemetry(Map<String, dynamic> telemetryData) async {
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/sensors/telemetry'),
@@ -154,7 +182,6 @@ class ApiService {
     return await _processResponse(response);
   }
 
-  // Simulator helper for AI Alerts
   Future<Map<String, dynamic>> sendAiAlert(Map<String, dynamic> aiData) async {
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/ai/health-alert'),
@@ -216,6 +243,15 @@ class ApiService {
     return await _processResponse(response);
   }
 
+  Future<Map<String, dynamic>> initiatePayment(String orderId, String paymentMethod) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/orders/$orderId/pay'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'paymentMethod': paymentMethod}),
+    );
+    return await _processResponse(response);
+  }
+
   Future<List<dynamic>> getOrders() async {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/orders'),
@@ -262,6 +298,23 @@ class ApiService {
     return await _processResponse(response);
   }
 
+  Future<Map<String, dynamic>> reportDelayedDelivery(String deliveryId, String delayReason) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/deliveries/$deliveryId/delay'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'delayReason': delayReason}),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> confirmDelivery(String deliveryId) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/deliveries/$deliveryId/confirm'),
+      headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
+
   // --- Notifications ---
   Future<List<dynamic>> getNotifications() async {
     final response = await http.get(
@@ -298,6 +351,15 @@ class ApiService {
     return data['stats'] ?? {};
   }
 
+  Future<Map<String, dynamic>> getReports() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/admin/reports'),
+      headers: ApiConfig.headers(token),
+    );
+    final data = await _processResponse(response);
+    return data['reports'] ?? {};
+  }
+
   Future<List<dynamic>> getAllUsers() async {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/admin/users'),
@@ -307,11 +369,38 @@ class ApiService {
     return data['users'] ?? [];
   }
 
-  Future<Map<String, dynamic>> updateUserRole(String userId, String role) async {
-    final response = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/admin/users/$userId/role'),
+  Future<List<dynamic>> getFarmers() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/admin/farmers'),
       headers: ApiConfig.headers(token),
-      body: jsonEncode({'role': role}),
+    );
+    final data = await _processResponse(response);
+    return data['farmers'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createUser(Map<String, dynamic> userData) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/admin/users'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode(userData),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> updateUser(String userId, Map<String, dynamic> userData) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/admin/users/$userId'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode(userData),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> setUserStatus(String userId, String status) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/admin/users/$userId/status'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'status': status}),
     );
     return await _processResponse(response);
   }

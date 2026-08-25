@@ -24,6 +24,14 @@ const Device = sequelize.define('Device', {
     type: DataTypes.ENUM('active', 'inactive', 'maintenance'),
     defaultValue: 'active'
   },
+  autoMode: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true // true = automatic threshold control, false = manual control
+  },
+  healthStatus: {
+    type: DataTypes.ENUM('excellent', 'good', 'warning', 'critical'),
+    defaultValue: 'good'
+  },
   farmId: {
     type: DataTypes.UUID,
     allowNull: false
@@ -31,27 +39,27 @@ const Device = sequelize.define('Device', {
   // Automation Thresholds
   foodThreshold: {
     type: DataTypes.FLOAT,
-    defaultValue: 20.0 // Low level trigger (%)
+    defaultValue: 20.0
   },
   waterThreshold: {
     type: DataTypes.FLOAT,
-    defaultValue: 20.0 // Low level trigger (%)
+    defaultValue: 20.0
   },
   tempMin: {
     type: DataTypes.FLOAT,
-    defaultValue: 20.0 // Min °C
+    defaultValue: 20.0
   },
   tempMax: {
     type: DataTypes.FLOAT,
-    defaultValue: 32.0 // Max °C
+    defaultValue: 32.0
   },
   humidityMin: {
     type: DataTypes.FLOAT,
-    defaultValue: 50.0 // Min %
+    defaultValue: 50.0
   },
   humidityMax: {
     type: DataTypes.FLOAT,
-    defaultValue: 75.0 // Max %
+    defaultValue: 75.0
   }
 }, {
   timestamps: true

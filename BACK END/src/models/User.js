@@ -29,12 +29,25 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: 'Customer'
   },
+  status: {
+    type: DataTypes.ENUM('active', 'suspended', 'blocked'),
+    allowNull: false,
+    defaultValue: 'active'
+  },
+  avatarUrl: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   phone: {
     type: DataTypes.STRING,
     allowNull: true
   },
   address: {
     type: DataTypes.TEXT,
+    allowNull: true
+  },
+  lastLoginAt: {
+    type: DataTypes.DATE,
     allowNull: true
   }
 }, {

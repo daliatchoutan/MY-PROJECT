@@ -30,7 +30,6 @@ class AuthProvider with ChangeNotifier {
         _user = profileRes['user'];
       }
     } catch (e) {
-      // Token invalid or server unreachable -> clear saved token
       await logout();
     } finally {
       _isLoading = false;
@@ -69,6 +68,7 @@ class AuthProvider with ChangeNotifier {
     required String role,
     String? phone,
     String? address,
+    String? avatarUrl,
   }) async {
     _isLoading = true;
     _error = null;
@@ -82,6 +82,7 @@ class AuthProvider with ChangeNotifier {
         role: role,
         phone: phone,
         address: address,
+        avatarUrl: avatarUrl,
       );
       _token = res['token'];
       _user = res['user'];
@@ -89,6 +90,25 @@ class AuthProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwt_token', _token!);
 
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateProfile(Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final res = await api.updateProfile(data);
+      _user = res['user'];
       _isLoading = false;
       notifyListeners();
       return true;
