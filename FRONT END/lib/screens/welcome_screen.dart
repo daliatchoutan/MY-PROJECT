@@ -122,7 +122,7 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Automating poultry farms, monitoring conditions, and connecting farmers with customers in FCFA.',
+                          'Automating poultry farms, monitoring conditions, and connecting farmers with customers.',
                           style: TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                         const SizedBox(height: 24),
@@ -143,7 +143,7 @@ class WelcomeScreen extends StatelessWidget {
                         _buildFeatureTile(
                           icon: Icons.shopping_basket,
                           color: Colors.green,
-                          title: 'Marketplace in FCFA',
+                          title: 'Marketplace',
                           subtitle: 'Buy & sell farm-fresh eggs, live poultry & feed.',
                         ),
                         _buildFeatureTile(
