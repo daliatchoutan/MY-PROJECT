@@ -29,6 +29,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '35000',
       'unit': 'pack',
       'description': 'Vaccinated day-old broiler chicks, high vitality',
+      'imageUrl': '/uploads/products/product_chicks.jpg',
       'farm': {'name': 'Green Hills Hatchery'}
     },
     {
@@ -38,6 +39,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '9000',
       'unit': 'bird',
       'description': 'Free-range mature rooster, strong and healthy',
+      'imageUrl': '/uploads/products/product_rooster.jpg',
       'farm': {'name': 'Sunrise Eco Farm'}
     },
     {
@@ -47,6 +49,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '4500',
       'unit': 'bird',
       'description': 'Healthy 2.5kg commercial broiler meat chicken',
+      'imageUrl': '/uploads/products/product_broiler.jpg',
       'farm': {'name': 'AgriTech Agro Farm'}
     },
     {
@@ -56,6 +59,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '6000',
       'unit': 'bird',
       'description': 'Rhode Island Red point of lay hens, ready for egg production',
+      'imageUrl': '/uploads/products/product_layer.jpg',
       'farm': {'name': 'Valley Pastures'}
     },
     {
@@ -65,6 +69,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '4800',
       'unit': 'chicken',
       'description': 'Dressed, cleaned whole poultry chicken ready for cooking',
+      'imageUrl': '/uploads/products/product_fresh_chicken.jpg',
       'farm': {'name': 'Green Hills Poultry'}
     },
     {
@@ -74,6 +79,7 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '3800',
       'unit': 'kg',
       'description': 'Fresh boneless chicken fillets and cut portions',
+      'imageUrl': '/uploads/products/product_meat.jpg',
       'farm': {'name': 'Sunrise Poultry'}
     },
     {
@@ -83,16 +89,38 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
       'price': '3500',
       'unit': 'tray',
       'description': 'Fresh free-range pasture raised table eggs',
+      'imageUrl': '/uploads/products/product_eggs.jpg',
       'farm': {'name': 'Valley Pastures'}
     },
     {
       'id': 'cat-8',
+      'name': 'Farm-Fresh Table Eggs (Pack of 12)',
+      'category': 'Eggs',
+      'price': '1500',
+      'unit': 'pack',
+      'description': 'Clean washed premium organic farm eggs',
+      'imageUrl': '/uploads/products/product_eggs.jpg',
+      'farm': {'name': 'Green Hills Poultry'}
+    },
+    {
+      'id': 'cat-9',
       'name': 'Poultry Starter Mash & Feed (25kg)',
       'category': 'Feed',
       'price': '14500',
       'unit': 'bag',
       'description': 'Balanced nutrient-dense chicken feed for growth and laying',
+      'imageUrl': '/uploads/products/product_feed.jpg',
       'farm': {'name': 'AgriTech Mills'}
+    },
+    {
+      'id': 'cat-10',
+      'name': 'Layer Pellets & Grain Feed (50kg)',
+      'category': 'Feed',
+      'price': '22000',
+      'unit': 'bag',
+      'description': 'High-protein grain pellets formulated for optimal egg production',
+      'imageUrl': '/uploads/products/product_feed.jpg',
+      'farm': {'name': 'Sunrise Agro Mills'}
     },
   ];
 
@@ -109,11 +137,17 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
         category: _selectedCategory == 'All' ? null : _selectedCategory,
       );
 
-      final combined = List<dynamic>.from(backendProducts);
+      final combined = <dynamic>[];
+      for (final p in backendProducts) {
+        if (ProductHelper.matchesCategory(p['category'], _selectedCategory)) {
+          combined.add(p);
+        }
+      }
+
       // If backend has few or no products, supplement with catalog items matching filter
       for (final def in _catalogDefaults) {
         if (!combined.any((p) => p['name'] == def['name'])) {
-          if (_selectedCategory == 'All' || def['category'] == _selectedCategory) {
+          if (ProductHelper.matchesCategory(def['category'], _selectedCategory)) {
             combined.add(def);
           }
         }
@@ -126,10 +160,10 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
         });
       }
     } catch (e) {
-      // Fallback to catalog defaults
-      final filtered = _selectedCategory == 'All'
-          ? _catalogDefaults
-          : _catalogDefaults.where((p) => p['category'] == _selectedCategory).toList();
+      // Fallback to catalog defaults matching filter
+      final filtered = _catalogDefaults
+          .where((p) => ProductHelper.matchesCategory(p['category'], _selectedCategory))
+          .toList();
       if (mounted) {
         setState(() {
           _products = filtered;
@@ -229,9 +263,9 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          // Category Selector
+          // Category Selector with Images
           SizedBox(
-            height: 42,
+            height: 46,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -247,6 +281,14 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
+                    avatar: ClipOval(
+                      child: Image.asset(
+                        ProductHelper.getCategoryThumbnail(cat),
+                        width: 22,
+                        height: 22,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                     label: Text(localizedCat),
                     selected: selected,
                     selectedColor: const Color(0xFF0D7A57),

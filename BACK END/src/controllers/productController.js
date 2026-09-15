@@ -20,8 +20,23 @@ const saveBase64Image = (base64String) => {
 const getDefaultBackendImage = (category, name) => {
   const cat = (category || '').toLowerCase();
   const n = (name || '').toLowerCase();
-  const combined = `${cat} ${n}`;
 
+  // 1. Strict category checks first
+  if (cat.includes('egg') || cat.includes('oeuf') || n.includes('egg') || n.includes('oeuf')) {
+    return '/uploads/products/product_eggs.jpg';
+  }
+  if (cat.includes('feed') || cat.includes('aliment') || cat.includes('provende') || n.includes('feed') || n.includes('mash')) {
+    return '/uploads/products/product_feed.jpg';
+  }
+  if (cat.includes('meat') || cat.includes('viande')) {
+    if (n.includes('whole') || n.includes('frais') || n.includes('fresh') || n.includes('dressed')) {
+      return '/uploads/products/product_fresh_chicken.jpg';
+    }
+    return '/uploads/products/product_meat.jpg';
+  }
+
+  // 2. Live Poultry Subtypes
+  const combined = `${cat} ${n}`;
   if (combined.includes('broiler') || combined.includes('chair')) {
     return '/uploads/products/product_broiler.jpg';
   }
@@ -31,21 +46,14 @@ const getDefaultBackendImage = (category, name) => {
   if (combined.includes('layer') || combined.includes('pondeuse')) {
     return '/uploads/products/product_layer.jpg';
   }
-  if (combined.includes('rooster') || combined.includes('coq')) {
+  if (combined.includes('rooster') || combined.includes('coq') || combined.includes('cockerel')) {
     return '/uploads/products/product_rooster.jpg';
   }
-  if (combined.includes('egg') || combined.includes('oeuf') || combined.includes('tray')) {
-    return '/uploads/products/product_eggs.jpg';
-  }
+
   if (combined.includes('meat') || combined.includes('viande') || combined.includes('fillet')) {
     return '/uploads/products/product_meat.jpg';
   }
-  if (combined.includes('feed') || combined.includes('aliment') || combined.includes('grain') || combined.includes('provende')) {
-    return '/uploads/products/product_feed.jpg';
-  }
-  if (combined.includes('fresh') || combined.includes('poulet frais')) {
-    return '/uploads/products/product_fresh_chicken.jpg';
-  }
+
   return '/uploads/products/product_chicken.jpg';
 };
 
@@ -97,7 +105,20 @@ const getProducts = async (req, res, next) => {
     let whereClause = { isAvailable: true };
 
     if (farmId) whereClause.farmId = farmId;
-    if (category) whereClause.category = category;
+    if (category && category !== 'All') {
+      const cat = category.toLowerCase();
+      if (cat.includes('egg')) {
+        whereClause.category = { [Op.like]: '%Egg%' };
+      } else if (cat.includes('meat')) {
+        whereClause.category = { [Op.like]: '%Meat%' };
+      } else if (cat.includes('feed')) {
+        whereClause.category = { [Op.like]: '%Feed%' };
+      } else if (cat.includes('live')) {
+        whereClause.category = { [Op.like]: '%Live%' };
+      } else {
+        whereClause.category = { [Op.like]: `%${category}%` };
+      }
+    }
     if (search) {
       whereClause.name = { [Op.like]: `%${search}%` };
     }

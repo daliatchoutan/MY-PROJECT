@@ -42,34 +42,89 @@ class ProductHelper {
     final name = (product['name'] ?? '').toString().toLowerCase();
     final cat = (product['category'] ?? '').toString().toLowerCase();
     final desc = (product['description'] ?? '').toString().toLowerCase();
-    final combined = '$name $cat $desc';
 
+    // 1. Strict Category Matching First
+    if (cat.contains('egg') || cat.contains('oeuf')) {
+      return 'assets/images/product_eggs.jpg';
+    }
+
+    if (cat.contains('feed') || cat.contains('aliment') || cat.contains('provende') || cat.contains('grain') || cat.contains('mash')) {
+      return 'assets/images/product_feed.jpg';
+    }
+
+    if (cat.contains('meat') || cat.contains('viande')) {
+      if (name.contains('whole') || name.contains('entier') || name.contains('poulet frais') || name.contains('dressed') || name.contains('fresh chicken')) {
+        return 'assets/images/product_fresh_chicken.jpg';
+      }
+      return 'assets/images/product_meat.jpg';
+    }
+
+    // 2. Keyword-Based Name & Description Matching
+    if (name.contains('egg') || name.contains('oeuf') || name.contains('tray') || desc.contains('table eggs') || desc.contains('laying eggs')) {
+      return 'assets/images/product_eggs.jpg';
+    }
+
+    if (name.contains('feed') || name.contains('mash') || name.contains('provende') || name.contains('aliment') || name.contains('pellet')) {
+      return 'assets/images/product_feed.jpg';
+    }
+
+    if (name.contains('fillet') || name.contains('breast') || name.contains('drumstick') || name.contains('thigh') || name.contains('cut') || name.contains('morceau') || (name.contains('meat') && !name.contains('live'))) {
+      return 'assets/images/product_meat.jpg';
+    }
+
+    if (name.contains('whole chicken') || name.contains('dressed') || name.contains('poulet frais') || (name.contains('fresh') && name.contains('chicken') && !name.contains('live') && !cat.contains('live'))) {
+      return 'assets/images/product_fresh_chicken.jpg';
+    }
+
+    // 3. Live Poultry Subtypes
+    final combined = '$name $cat $desc';
     if (combined.contains('chick') || combined.contains('day-old') || combined.contains('poussin')) {
       return 'assets/images/product_chicks.jpg';
     }
-    if (combined.contains('rooster') || combined.contains('coq')) {
+    if (combined.contains('rooster') || combined.contains('coq') || combined.contains('cockerel')) {
       return 'assets/images/product_rooster.jpg';
-    }
-    if (combined.contains('broiler') || combined.contains('chair')) {
-      return 'assets/images/product_broiler.jpg';
     }
     if (combined.contains('layer') || combined.contains('pondeuse')) {
       return 'assets/images/product_layer.jpg';
     }
-    if (combined.contains('farm-fresh') || combined.contains('fresh chicken') || combined.contains('poulet frais') || combined.contains('whole')) {
-      return 'assets/images/product_fresh_chicken.jpg';
-    }
-    if (combined.contains('egg') || combined.contains('oeuf') || combined.contains('tray')) {
-      return 'assets/images/product_eggs.jpg';
-    }
-    if (combined.contains('meat') || combined.contains('viande') || combined.contains('fillet') || combined.contains('drumstick')) {
-      return 'assets/images/product_meat.jpg';
-    }
-    if (combined.contains('feed') || combined.contains('grain') || combined.contains('aliment') || combined.contains('mash') || combined.contains('provende')) {
-      return 'assets/images/product_feed.jpg';
+    if (combined.contains('broiler') || combined.contains('chair')) {
+      return 'assets/images/product_broiler.jpg';
     }
 
     return 'assets/images/product_chicken.jpg';
+  }
+
+  // Returns image asset path corresponding to each category tab
+  static String getCategoryThumbnail(String category) {
+    final cat = category.toLowerCase();
+    if (cat.contains('egg') || cat.contains('oeuf')) {
+      return 'assets/images/product_eggs.jpg';
+    }
+    if (cat.contains('meat') || cat.contains('viande')) {
+      return 'assets/images/product_meat.jpg';
+    }
+    if (cat.contains('feed') || cat.contains('aliment') || cat.contains('provende')) {
+      return 'assets/images/product_feed.jpg';
+    }
+    if (cat.contains('live') || cat.contains('vivant') || cat.contains('poultry') || cat.contains('volaille')) {
+      return 'assets/images/product_broiler.jpg';
+    }
+    return 'assets/images/novara_logo.jpg';
+  }
+
+  // Flexible category matching across UI filters and backend data
+  static bool matchesCategory(String? productCategory, String filter) {
+    if (filter == 'All') return true;
+    if (productCategory == null || productCategory.trim().isEmpty) return false;
+    final cat = productCategory.toLowerCase();
+    final f = filter.toLowerCase();
+
+    if (f.contains('egg')) return cat.contains('egg') || cat.contains('oeuf');
+    if (f.contains('meat')) return cat.contains('meat') || cat.contains('viande');
+    if (f.contains('feed')) return cat.contains('feed') || cat.contains('aliment') || cat.contains('provende');
+    if (f.contains('live')) return cat.contains('live') || cat.contains('vivant') || cat.contains('poultry') || cat.contains('volaille');
+
+    return cat.contains(f);
   }
 
   // List of distinct realistic farm backgrounds
