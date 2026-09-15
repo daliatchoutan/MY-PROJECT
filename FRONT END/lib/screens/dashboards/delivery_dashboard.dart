@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
+import '../../widgets/language_switcher.dart';
 import '../notifications_screen.dart';
 import '../profile_screen.dart';
 import '../welcome_screen.dart';
@@ -75,10 +77,12 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
           ElevatedButton(
             onPressed: () async {
               final auth = Provider.of<AuthProvider>(context, listen: false);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               await auth.api.reportDelayedDelivery(deliveryId, reasonCtrl.text);
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
               _loadDeliveries();
-              ScaffoldMessenger.of(context).showSnackBar(
+              scaffoldMessenger.showSnackBar(
                 const SnackBar(content: Text('Delay reported to customer & farmer'), backgroundColor: Colors.orange),
               );
             },
@@ -92,16 +96,17 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
 
   void _confirmSuccessfulDelivery(String deliveryId) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       await auth.api.confirmDelivery(deliveryId);
-      _loadDeliveries();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      _loadDeliveries();
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text('Delivery successfully confirmed and completed!'), backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
       );
     }
@@ -110,14 +115,24 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final locale = Provider.of<LocaleProvider>(context);
     final avatarUrl = auth.user?['avatarUrl'];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NOVARA Courier Portal'),
-        backgroundColor: Colors.purple.shade700,
+        title: Row(
+          children: [
+            ClipOval(
+              child: Image.asset('assets/images/novara_logo.jpg', width: 30, height: 30, fit: BoxFit.cover),
+            ),
+            const SizedBox(width: 8),
+            Text(locale.tr('role_delivery')),
+          ],
+        ),
+        backgroundColor: const Color(0xFF6B21A8),
         foregroundColor: Colors.white,
         actions: [
+          const LanguageSwitcher(isLight: true),
           IconButton(
             icon: CircleAvatar(
               radius: 14,

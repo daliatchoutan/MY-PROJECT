@@ -230,6 +230,28 @@ class ApiService {
     await _processResponse(response);
   }
 
+  Future<Map<String, dynamic>> uploadProductImage(String base64Image) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/products/upload-image'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'imageBase64': base64Image}),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<List<dynamic>> getProductTemplates() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/products/templates/images'),
+        headers: ApiConfig.headers(token),
+      );
+      final data = await _processResponse(response);
+      return data['templates'] ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   // --- Orders ---
   Future<Map<String, dynamic>> createOrder(List<Map<String, dynamic>> items, String shippingAddress) async {
     final response = await http.post(
@@ -270,6 +292,22 @@ class ApiService {
     return await _processResponse(response);
   }
 
+  Future<Map<String, dynamic>> updateOrder(String orderId, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/orders/$orderId'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode(data),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> cancelOrder(String orderId) async {
+    final response = await http.delete(
+      Uri.parse('${ApiConfig.baseUrl}/orders/$orderId'),
+      headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
   // --- Deliveries ---
   Future<List<dynamic>> getDeliveries() async {
     final response = await http.get(

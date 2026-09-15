@@ -120,7 +120,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: _getColorForType(type).withOpacity(0.15),
+                            backgroundColor: _getColorForType(type).withValues(alpha: 0.15),
                             child: Icon(_getIconForType(type), color: _getColorForType(type)),
                           ),
                           title: Text(

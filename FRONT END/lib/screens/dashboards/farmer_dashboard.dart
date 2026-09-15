@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
+import '../../widgets/language_switcher.dart';
+import '../../utils/product_helper.dart';
 import '../notifications_screen.dart';
 import '../profile_screen.dart';
 import '../welcome_screen.dart';
@@ -88,7 +94,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 'location': locCtrl.text,
                 'capacity': int.tryParse(capCtrl.text) ?? 1000,
               });
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
               _loadFarmerData();
             },
             child: const Text('Save Farm'),
@@ -134,7 +141,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 'name': nameCtrl.text,
                 'farmId': selectedFarmId,
               });
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
               _loadFarmerData();
             },
             child: const Text('Register'),
@@ -144,58 +152,665 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     );
   }
 
+  final List<Map<String, String>> _backendCatalogPresets = [
+    {
+      'name': 'Broiler Chicken',
+      'category': 'Live Poultry',
+      'url': '/uploads/products/product_broiler.jpg',
+      'asset': 'assets/images/product_broiler.jpg',
+      'unit': 'bird',
+    },
+    {
+      'name': 'Layer Chicken',
+      'category': 'Live Poultry',
+      'url': '/uploads/products/product_layer.jpg',
+      'asset': 'assets/images/product_layer.jpg',
+      'unit': 'bird',
+    },
+    {
+      'name': 'Day-Old Chicks',
+      'category': 'Live Poultry',
+      'url': '/uploads/products/product_chicks.jpg',
+      'asset': 'assets/images/product_chicks.jpg',
+      'unit': 'chick',
+    },
+    {
+      'name': 'Mature Rooster',
+      'category': 'Live Poultry',
+      'url': '/uploads/products/product_rooster.jpg',
+      'asset': 'assets/images/product_rooster.jpg',
+      'unit': 'bird',
+    },
+    {
+      'name': 'Farm-Fresh Whole Chicken',
+      'category': 'Poultry Meat',
+      'url': '/uploads/products/product_fresh_chicken.jpg',
+      'asset': 'assets/images/product_fresh_chicken.jpg',
+      'unit': 'kg',
+    },
+    {
+      'name': 'Fresh Farm Eggs Tray',
+      'category': 'Eggs',
+      'url': '/uploads/products/product_eggs.jpg',
+      'asset': 'assets/images/product_eggs.jpg',
+      'unit': 'tray',
+    },
+    {
+      'name': 'Poultry Cuts & Fillets',
+      'category': 'Poultry Meat',
+      'url': '/uploads/products/product_meat.jpg',
+      'asset': 'assets/images/product_meat.jpg',
+      'unit': 'kg',
+    },
+    {
+      'name': 'Nutritional Poultry Feed',
+      'category': 'Poultry Feed',
+      'url': '/uploads/products/product_feed.jpg',
+      'asset': 'assets/images/product_feed.jpg',
+      'unit': '50kg bag',
+    },
+  ];
+
   void _showAddProductDialog() {
     if (_farms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Create a farm first')));
       return;
     }
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final priceCtrl = TextEditingController(text: '5000');
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final nameCtrl = TextEditingController(text: 'Broiler Chicken');
+    final descCtrl = TextEditingController(text: 'Healthy, organically fed farm poultry');
+    final priceCtrl = TextEditingController(text: '4500');
     final stockCtrl = TextEditingController(text: '50');
-    String selectedFarmId = _farms.first['id'];
-    String category = 'Eggs';
+    String selectedFarmId = _farms.first['id'].toString();
+    String category = 'Live Poultry';
+    String unit = 'bird';
+    Uint8List? pickedImageBytes;
+    String? pickedImageBase64;
+    String? selectedPresetUrl = '/uploads/products/product_broiler.jpg';
+    bool isUploading = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Product to Marketplace'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedFarmId,
-                items: _farms.map<DropdownMenuItem<String>>((f) => DropdownMenuItem(value: f['id'].toString(), child: Text(f['name']))).toList(),
-                onChanged: (val) => selectedFarmId = val!,
-                decoration: const InputDecoration(labelText: 'Select Farm'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(locale.isFrench ? 'Ajouter un Produit (Hébergé au Backend)' : 'Add Product to Marketplace'),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedFarmId,
+                    items: _farms.map<DropdownMenuItem<String>>((f) => DropdownMenuItem(value: f['id'].toString(), child: Text(f['name']))).toList(),
+                    onChanged: (val) => setDialogState(() => selectedFarmId = val!),
+                    decoration: InputDecoration(labelText: locale.isFrench ? 'Ferme' : 'Select Farm'),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: category,
+                    items: ['Live Poultry', 'Eggs', 'Poultry Meat', 'Poultry Feed']
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        category = val!;
+                        if (category == 'Live Poultry') {
+                          unit = 'bird';
+                          selectedPresetUrl = '/uploads/products/product_broiler.jpg';
+                        } else if (category == 'Eggs') {
+                          unit = 'tray';
+                          selectedPresetUrl = '/uploads/products/product_eggs.jpg';
+                        } else if (category == 'Poultry Meat') {
+                          unit = 'kg';
+                          selectedPresetUrl = '/uploads/products/product_fresh_chicken.jpg';
+                        } else if (category == 'Poultry Feed') {
+                          unit = '50kg bag';
+                          selectedPresetUrl = '/uploads/products/product_feed.jpg';
+                        }
+                      });
+                    },
+                    decoration: InputDecoration(labelText: locale.isFrench ? 'Catégorie' : 'Category'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Nom du Produit' : 'Product Name',
+                      hintText: 'e.g. Broiler Chicken / Poulet de chair',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: priceCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(labelText: locale.isFrench ? 'Prix (FCFA)' : 'Price (FCFA)'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: stockCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(labelText: locale.isFrench ? 'Stock' : 'Stock Qty'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: unit,
+                          items: ['bird', 'tray', 'kg', '50kg bag', 'unit', 'crate']
+                              .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => unit = val!),
+                          decoration: InputDecoration(labelText: locale.isFrench ? 'Unité' : 'Unit'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: InputDecoration(labelText: locale.isFrench ? 'Description' : 'Description'),
+                  ),
+                  const SizedBox(height: 16),
+                  // Image upload section
+                  Text(
+                    locale.isFrench ? 'Photo du Produit (Hébergée au Backend)' : 'Product Image (Backend Upload / Hosting)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            color: Colors.grey.shade200,
+                            child: pickedImageBytes != null
+                                ? Image.memory(pickedImageBytes!, fit: BoxFit.cover)
+                                : ProductHelper.buildProductImage(
+                                    {'imageUrl': selectedPresetUrl, 'category': category, 'name': nameCtrl.text},
+                                    width: 70,
+                                    height: 70,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                pickedImageBytes != null
+                                    ? (locale.isFrench ? 'Photo personnalisée prête à téléverser' : 'Custom photo ready to upload')
+                                    : (locale.isFrench ? 'Image sélectionnée du catalogue backend' : 'Backend catalog image selected'),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: isUploading
+                                        ? null
+                                        : () async {
+                                            try {
+                                              final picker = ImagePicker();
+                                              final picked = await picker.pickImage(
+                                                source: ImageSource.gallery,
+                                                maxWidth: 1024,
+                                                maxHeight: 1024,
+                                                imageQuality: 85,
+                                              );
+                                              if (picked != null) {
+                                                final bytes = await picked.readAsBytes();
+                                                final base64 = base64Encode(bytes);
+                                                setDialogState(() {
+                                                  pickedImageBytes = bytes;
+                                                  pickedImageBase64 = base64;
+                                                });
+                                              }
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text('Picker error: $e')),
+                                                );
+                                              }
+                                            }
+                                          },
+                                    icon: const Icon(Icons.upload_file, size: 14),
+                                    label: Text(locale.isFrench ? 'Téléverser' : 'Upload', style: const TextStyle(fontSize: 11)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0D7A57),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  OutlinedButton.icon(
+                                    onPressed: isUploading
+                                        ? null
+                                        : () async {
+                                            try {
+                                              final picker = ImagePicker();
+                                              final picked = await picker.pickImage(
+                                                source: ImageSource.camera,
+                                                maxWidth: 1024,
+                                                maxHeight: 1024,
+                                                imageQuality: 85,
+                                              );
+                                              if (picked != null) {
+                                                final bytes = await picked.readAsBytes();
+                                                final base64 = base64Encode(bytes);
+                                                setDialogState(() {
+                                                  pickedImageBytes = bytes;
+                                                  pickedImageBase64 = base64;
+                                                });
+                                              }
+                                            } catch (_) {}
+                                          },
+                                    icon: const Icon(Icons.camera_alt, size: 14),
+                                    label: Text(locale.isFrench ? 'Caméra' : 'Camera', style: const TextStyle(fontSize: 11)),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    locale.isFrench ? 'Ou choisir une image pré-hébergée au backend:' : 'Or choose a pre-hosted backend image:',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 58,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _backendCatalogPresets.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 6),
+                      itemBuilder: (ctx, idx) {
+                        final preset = _backendCatalogPresets[idx];
+                        final isSelected = pickedImageBytes == null && selectedPresetUrl == preset['url'];
+
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              selectedPresetUrl = preset['url'];
+                              pickedImageBytes = null;
+                              pickedImageBase64 = null;
+                              if (nameCtrl.text.isEmpty || nameCtrl.text == 'Broiler Chicken') {
+                                nameCtrl.text = preset['name']!;
+                                category = preset['category']!;
+                                unit = preset['unit']!;
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 54,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFF0D7A57) : Colors.grey.shade300,
+                                width: isSelected ? 2.5 : 1,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Image.asset(preset['asset']!, fit: BoxFit.cover),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Product Name')),
-              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
-              TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price (FCFA)')),
-              TextField(controller: stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock Quantity')),
-            ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Annuler' : 'Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isUploading
+                  ? null
+                  : () async {
+                      if (nameCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(locale.isFrench ? 'Veuillez saisir un nom' : 'Please enter a product name')),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isUploading = true);
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final payload = <String, dynamic>{
+                          'farmId': selectedFarmId,
+                          'name': nameCtrl.text.trim(),
+                          'description': descCtrl.text.trim(),
+                          'price': double.tryParse(priceCtrl.text) ?? 5000.0,
+                          'stockQuantity': int.tryParse(stockCtrl.text) ?? 50,
+                          'category': category,
+                          'unit': unit,
+                        };
+
+                        if (pickedImageBase64 != null) {
+                          payload['imageBase64'] = pickedImageBase64;
+                        } else if (selectedPresetUrl != null) {
+                          payload['imageUrl'] = selectedPresetUrl;
+                        }
+
+                        await auth.api.createProduct(payload);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted) return;
+                        _loadFarmerData();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(locale.isFrench ? 'Produit créé avec succès au backend !' : 'Product successfully created and image hosted on backend!'),
+                            backgroundColor: const Color(0xFF0D7A57),
+                          ),
+                        );
+                      } catch (e) {
+                        setDialogState(() => isUploading = false);
+                        if (ctx.mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D7A57), foregroundColor: Colors.white),
+              child: isUploading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(locale.isFrench ? 'Enregistrer' : 'Add Product'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final auth = Provider.of<AuthProvider>(context, listen: false);
-              await auth.api.createProduct({
-                'farmId': selectedFarmId,
-                'name': nameCtrl.text,
-                'description': descCtrl.text,
-                'price': double.tryParse(priceCtrl.text) ?? 5000.0,
-                'stockQuantity': int.tryParse(stockCtrl.text) ?? 50,
-                'category': category,
-              });
-              Navigator.pop(ctx);
-              _loadFarmerData();
-            },
-            child: const Text('Add Product'),
-          )
-        ],
+      ),
+    );
+  }
+
+  void _showEditProductDialog(dynamic product) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final nameCtrl = TextEditingController(text: product['name'] ?? '');
+    final descCtrl = TextEditingController(text: product['description'] ?? '');
+    final priceCtrl = TextEditingController(text: product['price']?.toString() ?? '5000');
+    final stockCtrl = TextEditingController(text: product['stockQuantity']?.toString() ?? '50');
+    String category = product['category'] ?? 'Live Poultry';
+    String unit = product['unit'] ?? 'bird';
+    Uint8List? pickedImageBytes;
+    String? pickedImageBase64;
+    String? selectedPresetUrl = product['imageUrl'];
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(locale.isFrench ? 'Modifier le Produit' : 'Edit Product'),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: category,
+                    items: ['Live Poultry', 'Eggs', 'Poultry Meat', 'Poultry Feed']
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
+                    onChanged: (val) => setDialogState(() => category = val!),
+                    decoration: InputDecoration(labelText: locale.isFrench ? 'Catégorie' : 'Category'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(labelText: locale.isFrench ? 'Nom du Produit' : 'Product Name'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: priceCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(labelText: locale.isFrench ? 'Prix (FCFA)' : 'Price (FCFA)'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: stockCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(labelText: locale.isFrench ? 'Stock' : 'Stock Qty'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: ['bird', 'tray', 'kg', '50kg bag', 'unit', 'crate'].contains(unit) ? unit : 'unit',
+                          items: ['bird', 'tray', 'kg', '50kg bag', 'unit', 'crate']
+                              .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                              .toList(),
+                          onChanged: (val) => setDialogState(() => unit = val!),
+                          decoration: InputDecoration(labelText: locale.isFrench ? 'Unité' : 'Unit'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: InputDecoration(labelText: locale.isFrench ? 'Description' : 'Description'),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    locale.isFrench ? 'Photo du Produit' : 'Product Image',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            color: Colors.grey.shade200,
+                            child: pickedImageBytes != null
+                                ? Image.memory(pickedImageBytes!, fit: BoxFit.cover)
+                                : ProductHelper.buildProductImage(
+                                    {'imageUrl': selectedPresetUrl, 'category': category, 'name': nameCtrl.text},
+                                    width: 70,
+                                    height: 70,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                pickedImageBytes != null
+                                    ? (locale.isFrench ? 'Nouvelle photo sélectionnée' : 'New custom photo selected')
+                                    : (locale.isFrench ? 'Photo actuelle hébergée au backend' : 'Current backend image'),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 6),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    final picker = ImagePicker();
+                                    final picked = await picker.pickImage(
+                                      source: ImageSource.gallery,
+                                      maxWidth: 1024,
+                                      maxHeight: 1024,
+                                      imageQuality: 85,
+                                    );
+                                    if (picked != null) {
+                                      final bytes = await picked.readAsBytes();
+                                      final base64 = base64Encode(bytes);
+                                      setDialogState(() {
+                                        pickedImageBytes = bytes;
+                                        pickedImageBase64 = base64;
+                                      });
+                                    }
+                                  } catch (_) {}
+                                },
+                                icon: const Icon(Icons.photo_library, size: 14),
+                                label: Text(locale.isFrench ? 'Changer l\'image' : 'Change Image', style: const TextStyle(fontSize: 11)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D7A57),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    locale.isFrench ? 'Ou choisir une image prédéfinie:' : 'Or choose a catalog preset:',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 58,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _backendCatalogPresets.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 6),
+                      itemBuilder: (ctx, idx) {
+                        final preset = _backendCatalogPresets[idx];
+                        final isSelected = pickedImageBytes == null && selectedPresetUrl == preset['url'];
+
+                        return InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              selectedPresetUrl = preset['url'];
+                              pickedImageBytes = null;
+                              pickedImageBase64 = null;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 54,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFF0D7A57) : Colors.grey.shade300,
+                                width: isSelected ? 2.5 : 1,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Image.asset(preset['asset']!, fit: BoxFit.cover),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Annuler' : 'Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      setDialogState(() => isSaving = true);
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final payload = <String, dynamic>{
+                          'name': nameCtrl.text.trim(),
+                          'description': descCtrl.text.trim(),
+                          'price': double.tryParse(priceCtrl.text) ?? 5000.0,
+                          'stockQuantity': int.tryParse(stockCtrl.text) ?? 50,
+                          'category': category,
+                          'unit': unit,
+                        };
+
+                        if (pickedImageBase64 != null) {
+                          payload['imageBase64'] = pickedImageBase64;
+                        } else if (selectedPresetUrl != null) {
+                          payload['imageUrl'] = selectedPresetUrl;
+                        }
+
+                        await auth.api.updateProduct(product['id'], payload);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted) return;
+                        _loadFarmerData();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(locale.isFrench ? 'Produit mis à jour avec succès !' : 'Product successfully updated on backend!'),
+                            backgroundColor: const Color(0xFF0D7A57),
+                          ),
+                        );
+                      } catch (e) {
+                        setDialogState(() => isSaving = false);
+                        if (ctx.mounted) {
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D7A57), foregroundColor: Colors.white),
+              child: isSaving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(locale.isFrench ? 'Mettre à jour' : 'Save Changes'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -240,8 +855,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
 
   void _toggleAutoMode(String deviceId, bool currentAutoMode) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final res = await auth.api.toggleAutoMode(deviceId, !currentAutoMode);
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    scaffoldMessenger.showSnackBar(
       SnackBar(content: Text(res['message'] ?? 'Mode updated')),
     );
     _loadFarmerData();
@@ -249,14 +866,17 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
 
   void _triggerManualOverride(String deviceId, String action) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final res = await auth.api.manualOverride(deviceId, action);
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    scaffoldMessenger.showSnackBar(
       SnackBar(content: Text(res['message'] ?? 'Override command executed'), backgroundColor: Colors.amber.shade900),
     );
   }
 
   void _simulateTelemetry(String deviceSerial) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final res = await auth.api.sendTelemetry({
       'deviceSerial': deviceSerial,
       'foodLevel': 15.0, // Low -> triggers dispenser
@@ -264,7 +884,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
       'temperature': 34.5, // High -> triggers fan
       'humidity': 60.0,
     });
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+    scaffoldMessenger.showSnackBar(
       SnackBar(content: Text('Telemetry sent! Triggers: ${res['automationTriggers']?.length ?? 0}')),
     );
     _loadFarmerData();
@@ -273,22 +894,30 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final locale = Provider.of<LocaleProvider>(context);
     final unreadNotifs = _notifications.where((n) => !(n['isRead'] ?? false)).length;
     final avatarUrl = auth.user?['avatarUrl'];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NOVARA Farmer Portal'),
-        backgroundColor: Colors.green.shade700,
-        foregroundColor: Colors.white,
+        title: Row(
+          children: [
+            ClipOval(
+              child: Image.asset('assets/images/novara_logo.jpg', width: 30, height: 30, fit: BoxFit.cover),
+            ),
+            const SizedBox(width: 8),
+            Text(locale.tr('role_farmer')),
+          ],
+        ),
         actions: [
+          const LanguageSwitcher(isLight: true),
           IconButton(
             icon: CircleAvatar(
               radius: 14,
               backgroundColor: Colors.white,
               backgroundImage: (avatarUrl != null && avatarUrl.toString().isNotEmpty) ? NetworkImage(avatarUrl) : null,
               child: (avatarUrl == null || avatarUrl.toString().isEmpty)
-                  ? Text((auth.user?['name'] ?? 'F')[0].toUpperCase(), style: const TextStyle(fontSize: 12, color: Colors.green))
+                  ? Text((auth.user?['name'] ?? 'F')[0].toUpperCase(), style: const TextStyle(fontSize: 12, color: Color(0xFF0D7A57)))
                   : null,
             ),
             tooltip: 'My Profile',
@@ -310,7 +939,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                   top: 8,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: Color(0xFFE67E22), shape: BoxShape.circle),
                     child: Text(
                       '$unreadNotifs',
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
@@ -334,13 +963,14 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
           isScrollable: true,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.amber,
-          tabs: const [
-            Tab(icon: Icon(Icons.agriculture), text: 'Farms'),
-            Tab(icon: Icon(Icons.sensors), text: 'Conditions & IoT'),
-            Tab(icon: Icon(Icons.warning_amber), text: 'AI Health Alerts'),
-            Tab(icon: Icon(Icons.inventory), text: 'Products'),
-            Tab(icon: Icon(Icons.shopping_basket), text: 'Customer Orders'),
+          indicatorColor: const Color(0xFFE67E22),
+          indicatorWeight: 3,
+          tabs: [
+            Tab(icon: const Icon(Icons.agriculture), text: locale.tr('tab_farms')),
+            Tab(icon: const Icon(Icons.sensors), text: locale.tr('tab_iot')),
+            Tab(icon: const Icon(Icons.warning_amber), text: locale.tr('tab_alerts')),
+            Tab(icon: const Icon(Icons.inventory), text: locale.tr('tab_products')),
+            Tab(icon: const Icon(Icons.shopping_basket), text: locale.tr('tab_orders')),
           ],
         ),
       ),
@@ -360,43 +990,188 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   }
 
   Widget _buildFarmsTab() {
+    final locale = Provider.of<LocaleProvider>(context);
+
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddFarmDialog,
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: const Color(0xFF0D7A57),
         child: const Icon(Icons.add, color: Colors.white),
       ),
       body: _farms.isEmpty
-          ? const Center(child: Text('No farms registered yet. Click + to add your poultry farm.'))
+          ? Center(child: Text(locale.isFrench ? 'Aucune ferme enregistrée. Cliquez sur + pour ajouter.' : 'No farms registered yet. Click + to add your poultry farm.'))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _farms.length,
               itemBuilder: (ctx, idx) {
                 final f = _farms[idx];
+                final farmBg = ProductHelper.getFarmBackground(idx);
+
                 return Card(
                   elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Farm header banner with unique realistic background photo
+                      Container(
+                        height: 95,
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: AssetImage(farmBg),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.black.withValues(alpha: 0.1), Colors.black.withValues(alpha: 0.70)],
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(12),
+                          alignment: Alignment.bottomLeft,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                f['name'] ?? 'Farm',
+                                style: const TextStyle(
+                                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,
+                                  shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D7A57),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${f['devices']?.length ?? 0} IoT Clusters',
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(f['name'] ?? 'Farm', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            Chip(label: Text('${f['devices']?.length ?? 0} IoT Clusters'), backgroundColor: Colors.green.shade50),
+                            Text('📍 ${f['location'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 4),
+                            Text('🐔 ${locale.tr('capacity')}: ${f['currentPoultryCount'] ?? 0} / ${f['capacity'] ?? 0} birds'),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: () => _showEditFarmDialog(f),
+                                  icon: const Icon(Icons.edit, size: 16),
+                                  label: Text(locale.tr('edit_farm')),
+                                  style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.blue.shade700,
+                                      side: BorderSide(color: Colors.blue.shade700)),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () => _confirmDeleteFarm(f),
+                                  icon: const Icon(Icons.delete_outline, size: 16),
+                                  label: Text(locale.tr('delete_farm')),
+                                  style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red,
+                                      side: const BorderSide(color: Colors.red)),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text('📍 Location: ${f['location'] ?? 'N/A'}'),
-                        Text('🐔 Flock Capacity: ${f['currentPoultryCount'] ?? 0} / ${f['capacity'] ?? 0} birds'),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 );
               },
             ),
+    );
+  }
+
+  void _showEditFarmDialog(dynamic f) {
+    final nameCtrl = TextEditingController(text: f['name']);
+    final locCtrl = TextEditingController(text: f['location']);
+    final capCtrl = TextEditingController(text: '${f['capacity'] ?? 0}');
+    final countCtrl = TextEditingController(text: '${f['currentPoultryCount'] ?? 0}');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Farm'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Farm Name')),
+              TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location')),
+              TextField(controller: capCtrl, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Max Capacity (birds)')),
+              TextField(controller: countCtrl, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Current Poultry Count')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              await auth.api.updateFarm(f['id'], {
+                'name': nameCtrl.text,
+                'location': locCtrl.text,
+                'capacity': int.tryParse(capCtrl.text) ?? 0,
+                'currentPoultryCount': int.tryParse(countCtrl.text) ?? 0,
+              });
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
+              _loadFarmerData();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteFarm(dynamic f) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Farm'),
+        content: Text('Are you sure you want to delete "${f['name']}"? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              await auth.api.deleteFarm(f['id']);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
+              _loadFarmerData();
+              scaffoldMessenger.showSnackBar(
+                const SnackBar(content: Text('Farm deleted'), backgroundColor: Colors.red),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -465,7 +1240,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                               ),
                               Switch(
                                 value: isAuto,
-                                activeColor: Colors.green,
+                                activeThumbColor: Colors.green,
                                 onChanged: (val) => _toggleAutoMode(d['id'], isAuto),
                               ),
                             ],
@@ -591,16 +1366,75 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
               itemBuilder: (ctx, idx) {
                 final p = _products[idx];
                 return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   child: ListTile(
-                    title: Text(p['name'] ?? 'Product'),
-                    subtitle: Text('${p['price']} FCFA | Stock: ${p['stockQuantity']} ${p['unit']}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () async {
-                        final auth = Provider.of<AuthProvider>(context, listen: false);
-                        await auth.api.deleteProduct(p['id']);
-                        _loadFarmerData();
-                      },
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: ProductHelper.buildProductImage(
+                        p,
+                        width: 54,
+                        height: 54,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            p['name'] ?? 'Product',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D7A57).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            p['category'] ?? '',
+                            style: const TextStyle(color: Color(0xFF0D7A57), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 2),
+                        Text(
+                          '${p['price']} FCFA | Stock: ${p['stockQuantity']} ${p['unit']}',
+                          style: const TextStyle(color: Color(0xFF0D7A57), fontWeight: FontWeight.bold),
+                        ),
+                        if (p['imageUrl'] != null && (p['imageUrl'] as String).isNotEmpty)
+                          Text(
+                            p['imageUrl'].toString().contains('product_') && !p['imageUrl'].toString().contains('/uploads/products/product_')
+                                ? 'Uploaded photo'
+                                : 'Backend image',
+                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          ),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.teal),
+                          tooltip: 'Edit product & image',
+                          onPressed: () => _showEditProductDialog(p),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: 'Delete product',
+                          onPressed: () async {
+                            final auth = Provider.of<AuthProvider>(context, listen: false);
+                            await auth.api.deleteProduct(p['id']);
+                            _loadFarmerData();
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -617,23 +1451,116 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             itemCount: _orders.length,
             itemBuilder: (ctx, idx) {
               final o = _orders[idx];
+              final delivery = o['delivery'];
+              final driverName = delivery?['deliveryPerson']?['name'];
+
               return Card(
-                child: ListTile(
-                  title: Text('Order #${o['id'].toString().substring(0, 8)}'),
-                  subtitle: Text('Total: ${o['totalAmount']} FCFA | Payment: ${o['paymentStatus']} | Status: ${o['status']}'),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (status) async {
-                      final auth = Provider.of<AuthProvider>(context, listen: false);
-                      await auth.api.updateOrderStatus(o['id'], status);
-                      _loadFarmerData();
-                    },
-                    itemBuilder: (ctx) => ['accepted', 'rejected', 'in_transit', 'delivered']
-                        .map((s) => PopupMenuItem(value: s, child: Text(s)))
-                        .toList(),
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Order #${o['id'].toString().substring(0, 8)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          PopupMenuButton<String>(
+                            onSelected: (status) async {
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              await auth.api.updateOrderStatus(o['id'], status);
+                              _loadFarmerData();
+                            },
+                            itemBuilder: (ctx) => ['accepted', 'rejected', 'in_transit', 'delivered']
+                                .map((s) => PopupMenuItem(value: s, child: Text(s)))
+                                .toList(),
+                            child: Chip(
+                              label: Text('${o['status']}'.toUpperCase(), style: const TextStyle(fontSize: 11)),
+                              backgroundColor: Colors.green.shade50,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Customer: ${o['customer']?['name'] ?? 'Customer'} | Total: ${o['totalAmount']} FCFA'),
+                      Text('Payment: ${o['paymentStatus']} | Delivery Status: ${delivery?['status'] ?? 'unassigned'}'),
+                      if (driverName != null) Text('Assigned Courier: $driverName'),
+                      const Divider(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (delivery != null && delivery['id'] != null)
+                            ElevatedButton.icon(
+                              onPressed: () => _showAssignDeliveryDialog(delivery['id']),
+                              icon: const Icon(Icons.delivery_dining, size: 16),
+                              label: Text(driverName == null ? 'Assign Courier' : 'Reassign Courier'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple.shade700,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               );
             },
           );
+  }
+
+  void _showAssignDeliveryDialog(String deliveryId) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final users = await auth.api.getAllUsers();
+    final drivers = users.where((u) => u['role'] == 'Delivery Person').toList();
+
+    if (!mounted) return;
+
+    if (drivers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No delivery couriers registered on the platform yet.')),
+      );
+      return;
+    }
+
+    String selectedDriverId = drivers.first['id'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Assign Delivery Courier'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selectedDriverId,
+            decoration: const InputDecoration(labelText: 'Select Delivery Person', border: OutlineInputBorder()),
+            items: drivers.map<DropdownMenuItem<String>>((d) {
+              return DropdownMenuItem(value: d['id'].toString(), child: Text('${d['name']} (${d['phone'] ?? 'No phone'})'));
+            }).toList(),
+            onChanged: (val) => setDialogState(() => selectedDriverId = val!),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                await auth.api.assignDelivery(deliveryId, selectedDriverId);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (!mounted) return;
+                _loadFarmerData();
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(content: Text('Delivery assigned successfully'), backgroundColor: Colors.green),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade700, foregroundColor: Colors.white),
+              child: const Text('Assign'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

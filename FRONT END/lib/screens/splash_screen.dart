@@ -63,45 +63,61 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green.shade800,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.egg_alt_rounded,
-                size: 80,
-                color: Colors.green.shade800,
-              ),
+      body: Stack(
+        children: [
+          // Farm background
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/farm_bg_1.jpg',
+              fit: BoxFit.cover,
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'NOVARA',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2.0,
-              ),
+          ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withValues(alpha: 0.45)),
+          ),
+          // Centered content
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Hero(
+                  tag: 'novara_logo',
+                  child: Container(
+                    width: 110,
+                    height: 110,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black38, blurRadius: 20, offset: Offset(0, 6)),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.asset('assets/images/novara_logo.jpg', fit: BoxFit.cover),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'NOVARA',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3.0,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Smart Poultry Farm Automation & Marketplace',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 48),
+                const CircularProgressIndicator(color: Colors.white),
+              ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Smart Poultry Farm Automation & Marketplace',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 48),
-            const CircularProgressIndicator(color: Colors.white),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

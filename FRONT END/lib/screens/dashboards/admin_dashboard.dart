@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
+import '../../widgets/language_switcher.dart';
 import '../notifications_screen.dart';
 import '../profile_screen.dart';
 import '../welcome_screen.dart';
@@ -91,7 +93,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                 'role': selectedRole,
                 'phone': phoneCtrl.text,
               });
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
               _loadAdminData();
             },
             child: const Text('Create User'),
@@ -140,7 +143,8 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
                 'role': selectedRole,
                 'phone': phoneCtrl.text,
               });
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!mounted) return;
               _loadAdminData();
             },
             child: const Text('Save Changes'),
@@ -152,10 +156,11 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
 
   void _setUserStatus(String userId, String status) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     await auth.api.setUserStatus(userId, status);
-    _loadAdminData();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    _loadAdminData();
+    scaffoldMessenger.showSnackBar(
       SnackBar(content: Text('User status updated to $status')),
     );
   }
@@ -163,14 +168,24 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    final locale = Provider.of<LocaleProvider>(context);
     final avatarUrl = auth.user?['avatarUrl'];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NOVARA Administrator Portal'),
-        backgroundColor: Colors.blueGrey.shade900,
+        title: Row(
+          children: [
+            ClipOval(
+              child: Image.asset('assets/images/novara_logo.jpg', width: 30, height: 30, fit: BoxFit.cover),
+            ),
+            const SizedBox(width: 8),
+            Text(locale.tr('role_admin')),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E293B),
         foregroundColor: Colors.white,
         actions: [
+          const LanguageSwitcher(isLight: true),
           IconButton(
             icon: CircleAvatar(
               radius: 14,

@@ -202,9 +202,104 @@ const updateOrderStatus = async (req, res, next) => {
   }
 };
 
+const updateOrder = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const order = await Order.findByPk(req.params.id, {
+      include: [{ model: OrderItem, as: 'items' }],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    if (req.user.role === 'Customer' && order.customerId !== req.user.id) {
+      await transaction.rollback();
+      return res.status(403).json({ message: 'Forbidden. You do not own this order.' });
+    }
+
+    if (!['pending'].includes(order.status)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: `Order cannot be modified after it has been '${order.status}'.` });
+    }
+
+    const { shippingAddress, notes } = req.body;
+    if (shippingAddress) order.shippingAddress = shippingAddress;
+    if (notes !== undefined) order.notes = notes;
+    await order.save({ transaction });
+
+    await transaction.commit();
+
+    await Notification.create({
+      userId: order.customerId,
+      title: 'Order Updated',
+      message: `Your order #${order.id.substring(0, 8)} has been updated successfully.`,
+      type: 'order_update'
+    });
+
+    return res.json({ message: 'Order updated successfully', order });
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    next(error);
+  }
+};
+
+const cancelOrder = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const order = await Order.findByPk(req.params.id, {
+      include: [{ model: OrderItem, as: 'items', include: [{ model: Product, as: 'product' }] }],
+      transaction
+    });
+
+    if (!order) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    if (req.user.role === 'Customer' && order.customerId !== req.user.id) {
+      await transaction.rollback();
+      return res.status(403).json({ message: 'Forbidden. You do not own this order.' });
+    }
+
+    if (['delivered', 'in_transit', 'cancelled'].includes(order.status)) {
+      await transaction.rollback();
+      return res.status(400).json({ message: `Order cannot be cancelled when status is '${order.status}'.` });
+    }
+
+    // Restore stock for each item
+    for (const item of order.items) {
+      if (item.product) {
+        item.product.stockQuantity += item.quantity;
+        await item.product.save({ transaction });
+      }
+    }
+
+    order.status = 'cancelled';
+    await order.save({ transaction });
+    await transaction.commit();
+
+    await Notification.create({
+      userId: order.customerId,
+      title: 'Order Cancelled',
+      message: `Your order #${order.id.substring(0, 8)} has been cancelled. Stock has been restored.`,
+      type: 'order_update'
+    });
+
+    return res.json({ message: 'Order cancelled successfully', order });
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    next(error);
+  }
+};
+
 module.exports = {
   createOrder,
   initiatePayment,
   getOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  updateOrder,
+  cancelOrder
 };

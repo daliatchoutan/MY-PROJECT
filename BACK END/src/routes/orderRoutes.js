@@ -9,5 +9,7 @@ router.post('/', authorizeRoles('Customer', 'Administrator'), orderController.cr
 router.post('/:id/pay', authorizeRoles('Customer', 'Administrator'), orderController.initiatePayment);
 router.get('/', orderController.getOrders);
 router.put('/:id/status', authorizeRoles('Farmer', 'Administrator'), orderController.updateOrderStatus);
+router.put('/:id', authorizeRoles('Customer', 'Administrator'), orderController.updateOrder);
+router.delete('/:id', authorizeRoles('Customer', 'Administrator'), orderController.cancelOrder);
 
 module.exports = router;
