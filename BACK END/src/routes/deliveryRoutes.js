@@ -6,6 +6,7 @@ const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 router.use(verifyToken);
 
 router.get('/', authorizeRoles('Delivery Person', 'Administrator', 'Farmer'), deliveryController.getMyDeliveries);
+router.get('/drivers', authorizeRoles('Farmer', 'Administrator'), deliveryController.getAvailableDrivers);
 router.put('/:id/assign', authorizeRoles('Farmer', 'Administrator'), deliveryController.assignDelivery);
 router.put('/:id/status', authorizeRoles('Delivery Person', 'Administrator'), deliveryController.updateDeliveryStatus);
 router.put('/:id/delay', authorizeRoles('Delivery Person', 'Administrator'), deliveryController.reportDelayedDelivery);

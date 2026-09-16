@@ -16,6 +16,7 @@ class DeliveryDashboard extends StatefulWidget {
 
 class _DeliveryDashboardState extends State<DeliveryDashboard> {
   List<dynamic> _deliveries = [];
+  int _unreadNotifsCount = 0;
   bool _isLoading = true;
 
   @override
@@ -29,9 +30,16 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     try {
       final deliveries = await auth.api.getDeliveries();
+      int unread = 0;
+      try {
+        final notifs = await auth.api.getNotifications();
+        unread = notifs.where((n) => n['isRead'] == false || n['isRead'] == 0).length;
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _deliveries = deliveries;
+          _unreadNotifsCount = unread;
           _isLoading = false;
         });
       }
@@ -42,12 +50,21 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
 
   Future<void> _updateStatus(String deliveryId, String newStatus) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
     try {
       await auth.api.updateDeliveryStatus(deliveryId, newStatus);
       _loadDeliveries();
       if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delivery marked as $newStatus')),
+        SnackBar(
+          content: Text(
+            locale.isFrench
+                ? 'Statut de livraison mis à jour : $newStatus'
+                : 'Delivery marked as $newStatus',
+          ),
+          backgroundColor: Colors.purple.shade700,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -58,22 +75,31 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
   }
 
   void _showReportDelayDialog(String deliveryId) {
-    final reasonCtrl = TextEditingController(text: 'Heavy traffic delay on highway');
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final reasonCtrl = TextEditingController(
+      text: locale.isFrench ? 'Ralentissement important sur la route / Embouteillages' : 'Heavy traffic delay on highway',
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Report Delivery Delay'),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber, color: Colors.orange),
+            const SizedBox(width: 8),
+            Text(locale.isFrench ? 'Signaler un retard' : 'Report Delivery Delay'),
+          ],
+        ),
         content: TextField(
           controller: reasonCtrl,
           maxLines: 2,
-          decoration: const InputDecoration(
-            labelText: 'Reason for Delay',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: locale.isFrench ? 'Motif du retard' : 'Reason for Delay',
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(locale.isFrench ? 'Annuler' : 'Cancel')),
           ElevatedButton(
             onPressed: () async {
               final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -82,12 +108,20 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (!mounted) return;
               _loadDeliveries();
+              scaffoldMessenger.hideCurrentSnackBar();
               scaffoldMessenger.showSnackBar(
-                const SnackBar(content: Text('Delay reported to customer & farmer'), backgroundColor: Colors.orange),
+                SnackBar(
+                  content: Text(
+                    locale.isFrench
+                        ? 'Retard signalé au client et au fermier'
+                        : 'Delay reported to customer & farmer',
+                  ),
+                  backgroundColor: Colors.orange,
+                ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
-            child: const Text('Report Delay'),
+            child: Text(locale.isFrench ? 'Confirmer le retard' : 'Report Delay'),
           ),
         ],
       ),
@@ -96,13 +130,22 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
 
   void _confirmSuccessfulDelivery(String deliveryId) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       await auth.api.confirmDelivery(deliveryId);
       if (!mounted) return;
       _loadDeliveries();
+      scaffoldMessenger.hideCurrentSnackBar();
       scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('Delivery successfully confirmed and completed!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(
+            locale.isFrench
+                ? 'Livraison confirmée avec succès ! Client notifié.'
+                : 'Delivery successfully confirmed and completed! Customer notified.',
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -117,6 +160,8 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
     final auth = Provider.of<AuthProvider>(context);
     final locale = Provider.of<LocaleProvider>(context);
     final avatarUrl = auth.user?['avatarUrl'];
+
+    final assignedCount = _deliveries.where((d) => d['status'] == 'assigned').length;
 
     return Scaffold(
       appBar: AppBar(
@@ -152,10 +197,36 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
             onPressed: _loadDeliveries,
           ),
           IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications),
+                if (_unreadNotifsCount > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '$_unreadNotifsCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+              _loadDeliveries();
+            },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -169,22 +240,72 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Colors.purple))
           : _deliveries.isEmpty
-              ? const Center(child: Text('No delivery tasks assigned.'))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delivery_dining, size: 64, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        locale.isFrench ? 'Aucune tâche de livraison assignée.' : 'No delivery tasks assigned yet.',
+                        style: const TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _loadDeliveries,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _deliveries.length,
+                    itemCount: _deliveries.length + (assignedCount > 0 ? 1 : 0),
                     itemBuilder: (ctx, idx) {
-                      final del = _deliveries[idx];
+                      if (assignedCount > 0 && idx == 0) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            border: Border.all(color: Colors.amber.shade800, width: 1.5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notification_important, color: Colors.amber.shade900, size: 30),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      locale.isFrench ? 'Nouvelle mission de livraison !' : 'New Delivery Assignment!',
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade900, fontSize: 14),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      locale.isFrench
+                                          ? 'Vous avez $assignedCount livraison(s) assignée(s). Cliquez sur "Accepter la livraison" ci-dessous.'
+                                          : 'You have $assignedCount pending task(s). Tap "Accept Delivery" below to confirm route.',
+                                      style: TextStyle(fontSize: 12, color: Colors.brown.shade900),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      final delIdx = assignedCount > 0 ? idx - 1 : idx;
+                      final del = _deliveries[delIdx];
                       final status = del['status'] ?? 'assigned';
                       final isDelayed = del['isDelayed'] ?? false;
 
                       return Card(
                         elevation: 3,
                         margin: const EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -203,14 +324,16 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
                                         ? Colors.green.shade100
                                         : status == 'delayed'
                                             ? Colors.orange.shade100
-                                            : Colors.purple.shade100,
+                                            : status == 'assigned'
+                                                ? Colors.amber.shade100
+                                                : Colors.purple.shade100,
                                   ),
                                 ],
                               ),
                               const Divider(),
                               Text('📍 Dropoff Address: ${del['dropoffAddress'] ?? 'N/A'}'),
                               const SizedBox(height: 4),
-                              Text('👤 Customer Contact: ${del['order']?['customer']?['name'] ?? 'Customer'} (${del['order']?['customer']?['phone'] ?? 'N/A'})'),
+                              Text('👤 Customer: ${del['order']?['customer']?['name'] ?? 'Customer'} (${del['order']?['customer']?['phone'] ?? 'N/A'})'),
                               if (isDelayed) ...[
                                 const SizedBox(height: 8),
                                 Container(
@@ -228,28 +351,28 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
                                     ElevatedButton.icon(
                                       onPressed: () => _updateStatus(del['id'], 'accepted'),
                                       icon: const Icon(Icons.check_circle_outline),
-                                      label: const Text('Accept Delivery'),
+                                      label: Text(locale.isFrench ? 'Accepter la livraison' : 'Accept Delivery'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
                                     ),
                                   if (status == 'accepted' || status == 'assigned')
                                     ElevatedButton.icon(
                                       onPressed: () => _updateStatus(del['id'], 'picked_up'),
                                       icon: const Icon(Icons.local_shipping_outlined),
-                                      label: const Text('Mark Picked Up'),
+                                      label: Text(locale.isFrench ? 'Colis récupéré' : 'Mark Picked Up'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
                                     ),
                                   if (status != 'delivered')
                                     ElevatedButton.icon(
                                       onPressed: () => _showReportDelayDialog(del['id']),
                                       icon: const Icon(Icons.warning_amber),
-                                      label: const Text('Report Delay'),
+                                      label: Text(locale.isFrench ? 'Signaler retard' : 'Report Delay'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
                                     ),
                                   if (status != 'delivered')
                                     ElevatedButton.icon(
                                       onPressed: () => _confirmSuccessfulDelivery(del['id']),
                                       icon: const Icon(Icons.task_alt),
-                                      label: const Text('Confirm Successful Delivery'),
+                                      label: Text(locale.isFrench ? 'Confirmer livraison effectuée' : 'Confirm Successful Delivery'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
                                     ),
                                 ],

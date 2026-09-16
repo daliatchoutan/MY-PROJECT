@@ -318,6 +318,15 @@ class ApiService {
     return data['deliveries'] ?? [];
   }
 
+  Future<List<dynamic>> getDeliveryDrivers() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/deliveries/drivers'),
+      headers: ApiConfig.headers(token),
+    );
+    final data = await _processResponse(response);
+    return data['drivers'] ?? [];
+  }
+
   Future<Map<String, dynamic>> assignDelivery(String deliveryId, String driverId) async {
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/deliveries/$deliveryId/assign'),

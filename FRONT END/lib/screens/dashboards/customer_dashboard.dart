@@ -188,15 +188,20 @@ class _CustomerDashboardState extends State<CustomerDashboard>
   void _showCartSheet() {
     final cart = Provider.of<CartProvider>(context, listen: false);
     final locale = Provider.of<LocaleProvider>(context, listen: false);
-    final addressCtrl = TextEditingController();
+    final addressCtrl = TextEditingController(text: 'Yaoundé, Cameroon');
+    bool isPlacingOrder = false;
+    String? addressError;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Padding(
           padding: EdgeInsets.only(
-            top: 24, left: 24, right: 24,
+            top: 20, left: 20, right: 20,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
           child: Column(
@@ -206,92 +211,148 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(locale.tr('my_cart'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      const Icon(Icons.shopping_cart, color: Color(0xFF0D7A57)),
+                      const SizedBox(width: 8),
+                      Text(locale.tr('my_cart'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               const Divider(),
               if (cart.items.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Center(child: Text(locale.tr('cart_empty'))),
+                  padding: const EdgeInsets.symmetric(vertical: 36),
+                  child: Column(
+                    children: [
+                      Icon(Icons.remove_shopping_cart_outlined, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(locale.tr('cart_empty'), style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                    ],
+                  ),
                 )
               else ...[
                 Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: cart.items.values.map((item) {
-                      return ListTile(
-                        title: Text(item.name),
-                        subtitle: Text('${item.price.toStringAsFixed(0)} FCFA × ${item.quantity}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () {
-                                cart.updateQuantity(item.productId, item.quantity - 1);
-                                setSheetState(() {});
-                              },
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(ctx).size.height * 0.4,
+                    ),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: cart.items.values.map((item) {
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          subtitle: Text('${item.price.toStringAsFixed(0)} FCFA × ${item.quantity}'),
+                          trailing: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            Text('${item.quantity}'),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              onPressed: () {
-                                cart.updateQuantity(item.productId, item.quantity + 1);
-                                setSheetState(() {});
-                              },
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove, size: 18),
+                                  onPressed: isPlacingOrder ? null : () {
+                                    cart.updateQuantity(item.productId, item.quantity - 1);
+                                    setSheetState(() {});
+                                  },
+                                ),
+                                Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                IconButton(
+                                  icon: const Icon(Icons.add, size: 18),
+                                  onPressed: isPlacingOrder ? null : () {
+                                    cart.updateQuantity(item.productId, item.quantity + 1);
+                                    setSheetState(() {});
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
                 const Divider(),
                 TextField(
                   controller: addressCtrl,
+                  enabled: !isPlacingOrder,
+                  onChanged: (val) {
+                    if (addressError != null && val.trim().isNotEmpty) {
+                      setSheetState(() => addressError = null);
+                    }
+                  },
                   decoration: InputDecoration(
                     labelText: locale.tr('delivery_address'),
-                    prefixIcon: const Icon(Icons.location_on_outlined),
-                    border: const OutlineInputBorder(),
+                    hintText: locale.isFrench ? 'Ex: Yaoundé, Bastos' : 'Ex: Yaoundé, Bastos',
+                    errorText: addressError,
+                    prefixIcon: const Icon(Icons.location_on_outlined, color: Color(0xFF0D7A57)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('${locale.tr('total')}:', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('${locale.tr('total')}:', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     Text('${cart.totalAmount.toStringAsFixed(0)} FCFA',
                         style: const TextStyle(fontSize: 20, color: Color(0xFF0D7A57), fontWeight: FontWeight.bold)),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 ElevatedButton(
-                  onPressed: () async {
-                    if (addressCtrl.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(locale.isFrench ? 'Veuillez saisir une adresse' : 'Please enter a delivery address')),
-                      );
+                  onPressed: isPlacingOrder ? null : () async {
+                    final trimmedAddress = addressCtrl.text.trim();
+                    if (trimmedAddress.isEmpty) {
+                      setSheetState(() {
+                        addressError = locale.isFrench
+                            ? 'Veuillez saisir une adresse de livraison'
+                            : 'Please enter a delivery address';
+                      });
                       return;
                     }
+
+                    setSheetState(() {
+                      isPlacingOrder = true;
+                      addressError = null;
+                    });
+
                     final auth = Provider.of<AuthProvider>(context, listen: false);
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
                     try {
                       final orderRes = await auth.api.createOrder(
-                        cart.toApiFormat(), addressCtrl.text.trim(),
+                        cart.toApiFormat(), trimmedAddress,
                       );
                       cart.clear();
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (!mounted) return;
                       _loadData();
-                      _showPaymentDialog(
-                        orderRes['order']['id'], orderRes['order']['totalAmount']);
+
+                      final order = orderRes['order'] ?? orderRes;
+                      final orderId = order['id']?.toString() ?? '';
+                      final orderTotal = order['totalAmount'] ?? cart.totalAmount;
+
+                      _showPaymentDialog(orderId, orderTotal);
                     } catch (e) {
-                      if (!mounted) return;
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-                      );
+                      setSheetState(() => isPlacingOrder = false);
+                      if (ctx.mounted) {
+                        showDialog(
+                          context: ctx,
+                          builder: (c) => AlertDialog(
+                            title: Text(locale.isFrench ? 'Erreur de commande' : 'Order Error'),
+                            content: Text(e.toString().replaceAll('Exception: ', '')),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(c),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -300,7 +361,13 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: Text(locale.tr('place_order'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: isPlacingOrder
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                        )
+                      : Text(locale.tr('place_order'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ],
             ],
@@ -312,49 +379,88 @@ class _CustomerDashboardState extends State<CustomerDashboard>
 
   void _showPaymentDialog(String orderId, dynamic amount) {
     String selectedMethod = 'MTN Mobile Money';
+    bool isProcessing = false;
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Initiate Payment'),
+          title: Row(
+            children: [
+              const Icon(Icons.payment, color: Color(0xFF0D7A57)),
+              const SizedBox(width: 8),
+              Text(locale.isFrench ? 'Effectuer le paiement' : 'Initiate Payment'),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Total: $amount FCFA',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0D7A57))),
+              Text(
+                '${locale.tr('total')}: $amount FCFA',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0D7A57)),
+              ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: selectedMethod,
-                decoration: const InputDecoration(labelText: 'Payment Channel', border: OutlineInputBorder()),
+                decoration: InputDecoration(
+                  labelText: locale.isFrench ? 'Moyen de paiement' : 'Payment Channel',
+                  border: const OutlineInputBorder(),
+                ),
                 items: ['MTN Mobile Money', 'Orange Money', 'Credit / Debit Card']
                     .map((m) => DropdownMenuItem(value: m, child: Text(m)))
                     .toList(),
-                onChanged: (val) => setDialogState(() => selectedMethod = val!),
+                onChanged: isProcessing ? null : (val) => setDialogState(() => selectedMethod = val!),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Pay Later')),
+            TextButton(
+              onPressed: isProcessing ? null : () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Payer plus tard' : 'Pay Later'),
+            ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: isProcessing ? null : () async {
+                setDialogState(() => isProcessing = true);
                 final auth = Provider.of<AuthProvider>(context, listen: false);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
-                await auth.api.initiatePayment(orderId, selectedMethod);
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (!mounted) return;
-                _loadData();
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Payment of $amount FCFA confirmed via $selectedMethod!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                try {
+                  await auth.api.initiatePayment(orderId, selectedMethod);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (!mounted) return;
+                  _loadData();
+                  scaffoldMessenger.hideCurrentSnackBar();
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        locale.isFrench
+                            ? 'Paiement de $amount FCFA confirmé via $selectedMethod !'
+                            : 'Payment of $amount FCFA confirmed via $selectedMethod!',
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  setDialogState(() => isProcessing = false);
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D7A57), foregroundColor: Colors.white),
-              child: const Text('Confirm Payment'),
+                backgroundColor: const Color(0xFF0D7A57),
+                foregroundColor: Colors.white,
+              ),
+              child: isProcessing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(locale.isFrench ? 'Confirmer' : 'Confirm Payment'),
             ),
           ],
         ),
@@ -700,10 +806,17 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                                         price: double.parse(p['price'].toString()),
                                         unit: p['unit'] ?? 'unit',
                                       );
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      final messenger = ScaffoldMessenger.of(context);
+                                      messenger.hideCurrentSnackBar();
+                                      messenger.showSnackBar(
                                         SnackBar(
-                                          content: Text('${p['name']} ${locale.isFrench ? 'ajouté au panier !' : 'added!'}'),
-                                          duration: const Duration(seconds: 1),
+                                          content: Text('${p['name']} ${locale.isFrench ? 'ajouté au panier !' : 'added to cart!'}'),
+                                          duration: const Duration(seconds: 3),
+                                          action: SnackBarAction(
+                                            label: locale.isFrench ? 'VOIR LE PANIER' : 'VIEW CART',
+                                            textColor: Colors.amberAccent,
+                                            onPressed: _showCartSheet,
+                                          ),
                                         ),
                                       );
                                     },

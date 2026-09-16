@@ -1444,8 +1444,9 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   }
 
   Widget _buildOrdersTab() {
+    final locale = Provider.of<LocaleProvider>(context);
     return _orders.isEmpty
-        ? const Center(child: Text('No customer orders received yet.'))
+        ? Center(child: Text(locale.isFrench ? 'Aucune commande reçue pour le moment.' : 'No customer orders received yet.'))
         : ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: _orders.length,
@@ -1492,17 +1493,20 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          if (delivery != null && delivery['id'] != null)
-                            ElevatedButton.icon(
-                              onPressed: () => _showAssignDeliveryDialog(delivery['id']),
-                              icon: const Icon(Icons.delivery_dining, size: 16),
-                              label: Text(driverName == null ? 'Assign Courier' : 'Reassign Courier'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.purple.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              ),
+                          ElevatedButton.icon(
+                            onPressed: () => _showAssignDeliveryDialog(delivery?['id']?.toString() ?? o['id'].toString()),
+                            icon: const Icon(Icons.delivery_dining, size: 16),
+                            label: Text(
+                              driverName == null
+                                  ? (locale.isFrench ? 'Assigner un livreur' : 'Assign Courier')
+                                  : (locale.isFrench ? 'Réassigner: $driverName' : 'Reassign: $driverName'),
                             ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -1513,50 +1517,152 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
           );
   }
 
-  void _showAssignDeliveryDialog(String deliveryId) async {
+  void _showAssignDeliveryDialog(String deliveryOrOrderId) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final users = await auth.api.getAllUsers();
-    final drivers = users.where((u) => u['role'] == 'Delivery Person').toList();
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
 
-    if (!mounted) return;
+    // Immediate visual feedback during driver fetching
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: Colors.purple),
+      ),
+    );
 
-    if (drivers.isEmpty) {
+    List<dynamic> drivers = [];
+    try {
+      drivers = await auth.api.getDeliveryDrivers();
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No delivery couriers registered on the platform yet.')),
+        SnackBar(content: Text('Error loading couriers: $e'), backgroundColor: Colors.red),
       );
       return;
     }
 
-    String selectedDriverId = drivers.first['id'];
+    if (mounted) Navigator.pop(context); // Dismiss loading indicator
+    if (!mounted) return;
+
+    if (drivers.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.purple),
+              const SizedBox(width: 8),
+              Text(locale.isFrench ? 'Aucun livreur disponible' : 'No Couriers Available'),
+            ],
+          ),
+          content: Text(
+            locale.isFrench
+                ? 'Aucun livreur n\'est actuellement disponible sur la plateforme.'
+                : 'No delivery couriers are currently registered on the platform.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    String selectedDriverId = drivers.first['id'].toString();
+    bool isAssigning = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Assign Delivery Courier'),
-          content: DropdownButtonFormField<String>(
-            initialValue: selectedDriverId,
-            decoration: const InputDecoration(labelText: 'Select Delivery Person', border: OutlineInputBorder()),
-            items: drivers.map<DropdownMenuItem<String>>((d) {
-              return DropdownMenuItem(value: d['id'].toString(), child: Text('${d['name']} (${d['phone'] ?? 'No phone'})'));
-            }).toList(),
-            onChanged: (val) => setDialogState(() => selectedDriverId = val!),
+          title: Row(
+            children: [
+              const Icon(Icons.delivery_dining, color: Colors.purple),
+              const SizedBox(width: 8),
+              Text(locale.isFrench ? 'Assigner la livraison' : 'Assign Delivery Courier'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                locale.isFrench
+                    ? 'Sélectionnez le livreur. Il recevra une notification instantanée avec les détails de la commande.'
+                    : 'Select a courier. They will receive an instant notification with order details.',
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: selectedDriverId,
+                decoration: InputDecoration(
+                  labelText: locale.isFrench ? 'Sélectionner le livreur' : 'Select Delivery Person',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person_pin, color: Colors.purple),
+                ),
+                items: drivers.map<DropdownMenuItem<String>>((d) {
+                  return DropdownMenuItem(
+                    value: d['id'].toString(),
+                    child: Text('${d['name']} (${d['phone'] ?? d['email'] ?? 'Novara Courier'})'),
+                  );
+                }).toList(),
+                onChanged: isAssigning ? null : (val) => setDialogState(() => selectedDriverId = val!),
+              ),
+            ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+              onPressed: isAssigning ? null : () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Annuler' : 'Cancel'),
+            ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: isAssigning ? null : () async {
+                setDialogState(() => isAssigning = true);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
-                await auth.api.assignDelivery(deliveryId, selectedDriverId);
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (!mounted) return;
-                _loadFarmerData();
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(content: Text('Delivery assigned successfully'), backgroundColor: Colors.green),
-                );
+                try {
+                  await auth.api.assignDelivery(deliveryOrOrderId, selectedDriverId);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (!mounted) return;
+                  _loadFarmerData();
+
+                  final selectedDriver = drivers.firstWhere(
+                    (d) => d['id'].toString() == selectedDriverId,
+                    orElse: () => {'name': 'Courier'},
+                  );
+
+                  scaffoldMessenger.hideCurrentSnackBar();
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        locale.isFrench
+                            ? 'Livraison assignée à ${selectedDriver['name']} ! Le livreur a été notifié.'
+                            : 'Delivery assigned to ${selectedDriver['name']}! Courier has been notified.',
+                      ),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                } catch (e) {
+                  setDialogState(() => isAssigning = false);
+                  if (ctx.mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade700, foregroundColor: Colors.white),
-              child: const Text('Assign'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade700,
+                foregroundColor: Colors.white,
+              ),
+              child: isAssigning
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(locale.isFrench ? 'Assigner' : 'Assign'),
             ),
           ],
         ),

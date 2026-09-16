@@ -74,6 +74,9 @@ class CartProvider with ChangeNotifier {
     return _items.values.map((item) => {
       'productId': item.productId,
       'quantity': item.quantity,
+      'name': item.name,
+      'price': item.price,
+      'unit': item.unit,
     }).toList();
   }
 }

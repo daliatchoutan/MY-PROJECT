@@ -1,9 +1,54 @@
 const { Delivery, Order, User, Notification } = require('../models');
+const bcrypt = require('bcryptjs');
+
+const getAvailableDrivers = async (req, res, next) => {
+  try {
+    let drivers = await User.findAll({
+      where: { role: 'Delivery Person' },
+      attributes: ['id', 'name', 'email', 'phone', 'avatarUrl', 'status']
+    });
+
+    // If none exist yet, automatically seed a default active Courier
+    if (drivers.length === 0) {
+      const hashedPassword = await bcrypt.hash('delivery123', 10);
+      const newDriver = await User.create({
+        name: 'Alain Dupont (Livreur)',
+        email: 'delivery@novara.cm',
+        password: hashedPassword,
+        role: 'Delivery Person',
+        status: 'active',
+        phone: '+237 670 123 456'
+      });
+      drivers = [newDriver];
+    }
+
+    return res.json({ drivers });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const assignDelivery = async (req, res, next) => {
   try {
     const { deliveryPersonId } = req.body;
-    const delivery = await Delivery.findByPk(req.params.id);
+    let delivery = await Delivery.findByPk(req.params.id);
+
+    // If not found by primary key, check if req.params.id is an orderId
+    if (!delivery) {
+      delivery = await Delivery.findOne({ where: { orderId: req.params.id } });
+    }
+
+    // If still not found, check if Order exists and auto-create the Delivery
+    if (!delivery) {
+      const order = await Order.findByPk(req.params.id);
+      if (order) {
+        delivery = await Delivery.create({
+          orderId: order.id,
+          status: 'unassigned',
+          dropoffAddress: order.shippingAddress || 'Customer Address'
+        });
+      }
+    }
 
     if (!delivery) {
       return res.status(404).json({ message: 'Delivery record not found.' });
@@ -22,14 +67,42 @@ const assignDelivery = async (req, res, next) => {
     delivery.assignedAt = new Date();
     await delivery.save();
 
+    // Fetch order details for rich notification
+    const order = await Order.findByPk(delivery.orderId, {
+      include: [{ model: User, as: 'customer', attributes: ['name', 'phone'] }]
+    });
+
+    const customerName = order?.customer?.name || 'Customer';
+    const customerPhone = order?.customer?.phone ? ` (Tel: ${order.customer.phone})` : '';
+    const dropoff = delivery.dropoffAddress ? ` - Delivery to: ${delivery.dropoffAddress}` : '';
+
+    // Create immediate notification for the Delivery Person
     await Notification.create({
       userId: driver.id,
-      title: 'New Delivery Assigned',
-      message: `You have been assigned to delivery #${delivery.id.substring(0, 8)}.`,
+      title: 'New Delivery Assigned! 🛵',
+      message: `You have been assigned to deliver order #${delivery.orderId.substring(0, 8)} for ${customerName}${customerPhone}${dropoff}. Tap to accept.`,
       type: 'delivery_update'
     });
 
-    return res.json({ message: 'Delivery assigned successfully', delivery });
+    // Also notify Customer that courier was assigned
+    if (order && order.customerId) {
+      await Notification.create({
+        userId: order.customerId,
+        title: 'Delivery Courier Assigned 🚚',
+        message: `${driver.name} has been assigned as your delivery courier for order #${order.id.substring(0, 8)}.`,
+        type: 'delivery_update'
+      });
+    }
+
+    // Reload with associations
+    const updatedDelivery = await Delivery.findByPk(delivery.id, {
+      include: [
+        { model: Order, as: 'order', include: [{ model: User, as: 'customer', attributes: ['id', 'name', 'phone'] }] },
+        { model: User, as: 'deliveryPerson', attributes: ['id', 'name', 'phone', 'email'] }
+      ]
+    });
+
+    return res.json({ message: 'Delivery assigned successfully', delivery: updatedDelivery });
   } catch (error) {
     next(error);
   }
@@ -190,6 +263,7 @@ const getMyDeliveries = async (req, res, next) => {
 };
 
 module.exports = {
+  getAvailableDrivers,
   assignDelivery,
   updateDeliveryStatus,
   reportDelayedDelivery,

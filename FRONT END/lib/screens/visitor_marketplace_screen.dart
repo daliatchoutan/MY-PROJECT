@@ -173,27 +173,41 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
     }
   }
 
-  void _promptAuthDialog(String actionName) {
+  void _promptAuthDialog(String productName) {
     final locale = Provider.of<LocaleProvider>(context, listen: false);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.lock_outline, color: Color(0xFF0D7A57)),
+            const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0D7A57)),
             const SizedBox(width: 8),
-            Text(locale.tr('sign_in')),
+            Expanded(
+              child: Text(
+                locale.isFrench ? 'Commander $productName' : 'Order $productName',
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
           ],
         ),
-        content: Text(locale.tr('visitor_order_prompt')),
+        content: Text(
+          locale.isFrench
+              ? 'Pour passer commande de $productName et suivre votre livraison, veuillez vous connecter ou créer un compte client en quelques secondes.'
+              : 'To order $productName and track your delivery, please sign in or create a customer account in just a few seconds.',
+        ),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
             },
-            child: Text(locale.tr('sign_in')),
+            child: Text(locale.tr('sign_in'), style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -328,88 +342,91 @@ class _VisitorMarketplaceScreenState extends State<VisitorMarketplaceScreen> {
                             elevation: 3,
                             clipBehavior: Clip.antiAlias,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                       ProductHelper.buildProductImage(
-                                         p,
-                                         fit: BoxFit.cover,
-                                       ),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            colors: [Colors.transparent, Colors.black.withValues(alpha: 0.20)],
-                                          ),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 6,
-                                        right: 6,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: InkWell(
+                              onTap: () => _promptAuthDialog(p['name'] ?? 'Product'),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                         ProductHelper.buildProductImage(
+                                           p,
+                                           fit: BoxFit.cover,
+                                         ),
+                                        Container(
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFE67E22),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            p['category'] ?? '',
-                                            style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.20)],
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                        Positioned(
+                                          top: 6,
+                                          right: 6,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE67E22),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              p['category'] ?? '',
+                                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(10),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        p['name'] ?? 'Product',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        p['farm']?['name'] ?? 'Farm Fresh',
-                                        style: const TextStyle(color: Colors.grey, fontSize: 11),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${p['price']} FCFA',
-                                        style: const TextStyle(
-                                          color: Color(0xFF0D7A57),
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
+                                  Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          p['name'] ?? 'Product',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: ElevatedButton(
-                                          onPressed: () => _promptAuthDialog('purchase ${p['name']}'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF0D7A57),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        Text(
+                                          p['farm']?['name'] ?? 'Farm Fresh',
+                                          style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${p['price']} FCFA',
+                                          style: const TextStyle(
+                                            color: Color(0xFF0D7A57),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
                                           ),
-                                          child: Text(locale.tr('order_items'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 8),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            onPressed: () => _promptAuthDialog(p['name'] ?? 'Product'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF0D7A57),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            child: Text(locale.tr('order_items'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           );
                         },
