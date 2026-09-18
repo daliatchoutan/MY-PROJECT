@@ -95,7 +95,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
       'price': '3500',
       'unit': 'tray',
       'description': 'Fresh free-range pasture raised table eggs',
-      'imageUrl': '/uploads/products/product_eggs.jpg',
+      'imageUrl': '/uploads/products/product_brown_eggs.jpg',
       'farm': {'name': 'Valley Pastures'}
     },
     {

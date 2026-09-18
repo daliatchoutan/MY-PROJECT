@@ -160,9 +160,9 @@ const updateUser = async (req, res, next) => {
 
 const setUserStatus = async (req, res, next) => {
   try {
-    const { status } = req.body; // 'active', 'suspended', 'blocked'
-    if (!['active', 'suspended', 'blocked'].includes(status)) {
-      return res.status(400).json({ message: "Status must be 'active', 'suspended', or 'blocked'." });
+    const { status, reason } = req.body;
+    if (!['active', 'pending', 'rejected', 'suspended', 'blocked'].includes(status)) {
+      return res.status(400).json({ message: "Status must be 'active', 'pending', 'rejected', 'suspended', or 'blocked'." });
     }
 
     const user = await User.findByPk(req.params.id);
@@ -171,16 +171,276 @@ const setUserStatus = async (req, res, next) => {
     }
 
     user.status = status;
+    if (status === 'rejected' && reason) {
+      user.rejectionReason = reason;
+    }
+    if (status === 'active') {
+      user.approvedAt = new Date();
+      user.approvedBy = req.user.id;
+      user.rejectionReason = null;
+    }
     await user.save();
 
     await Notification.create({
       userId: user.id,
       title: `Account Status Update: ${status.toUpperCase()}`,
-      message: `Your NOVARA account status has been updated to '${status}' by an administrator.`,
+      message: `Your NOVARA account status has been updated to '${status}' by an administrator.${reason ? ` Reason: ${reason}` : ''}`,
       type: 'system'
     });
 
     return res.json({ message: `User account is now '${status}'`, user: { id: user.id, name: user.name, status: user.status } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPendingApprovals = async (req, res, next) => {
+  try {
+    const pendingFarmers = await User.findAll({
+      where: { role: 'Farmer', status: 'pending' },
+      attributes: { exclude: ['password'] },
+      include: [{ model: Farm, as: 'farms' }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const pendingDrivers = await User.findAll({
+      where: { role: 'Delivery Person', status: 'pending' },
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']]
+    });
+
+    const pendingFarms = await Farm.findAll({
+      where: { status: 'pending' },
+      include: [{ model: User, as: 'farmer', attributes: ['id', 'name', 'email', 'phone'] }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return res.json({
+      pendingFarmers,
+      pendingDrivers,
+      pendingFarms,
+      totalPending: pendingFarmers.length + pendingDrivers.length + pendingFarms.length
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const approveFarmer = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const farmer = await User.findOne({ where: { id, role: 'Farmer' } });
+    if (!farmer) {
+      return res.status(404).json({ message: 'Farmer not found.' });
+    }
+
+    farmer.status = 'active';
+    farmer.approvedAt = new Date();
+    farmer.approvedBy = req.user.id;
+    farmer.rejectionReason = null;
+    await farmer.save();
+
+    // Also approve all pending farms created by this farmer during registration
+    await Farm.update(
+      { status: 'approved', approvedAt: new Date(), approvedBy: req.user.id, rejectionReason: null },
+      { where: { farmerId: farmer.id, status: 'pending' } }
+    );
+
+    await Notification.create({
+      userId: farmer.id,
+      title: 'Farmer Account Approved! Welcome to NOVARA',
+      message: 'Your farmer account and poultry farm have been officially approved by the administrator. You can now access full farm monitoring, flock management, and product listings.',
+      type: 'system'
+    });
+
+    return res.json({
+      message: 'Farmer account and associated farms have been approved successfully.',
+      farmer: {
+        id: farmer.id,
+        name: farmer.name,
+        email: farmer.email,
+        role: farmer.role,
+        status: farmer.status,
+        approvedAt: farmer.approvedAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rejectFarmer = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const farmer = await User.findOne({ where: { id, role: 'Farmer' } });
+    if (!farmer) {
+      return res.status(404).json({ message: 'Farmer not found.' });
+    }
+
+    const rejectionReason = reason && reason.trim().length > 0
+      ? reason.trim()
+      : 'Farm registration details could not be validated or did not meet platform criteria.';
+
+    farmer.status = 'rejected';
+    farmer.rejectionReason = rejectionReason;
+    await farmer.save();
+
+    await Farm.update(
+      { status: 'rejected', rejectionReason },
+      { where: { farmerId: farmer.id, status: 'pending' } }
+    );
+
+    await Notification.create({
+      userId: farmer.id,
+      title: 'Registration Application Declined',
+      message: `Your farmer registration application was declined. Reason: ${rejectionReason}`,
+      type: 'system'
+    });
+
+    return res.json({
+      message: 'Farmer registration rejected.',
+      farmer: {
+        id: farmer.id,
+        name: farmer.name,
+        email: farmer.email,
+        status: farmer.status,
+        rejectionReason: farmer.rejectionReason
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const approveDeliveryPerson = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const driver = await User.findOne({ where: { id, role: 'Delivery Person' } });
+    if (!driver) {
+      return res.status(404).json({ message: 'Delivery Person not found.' });
+    }
+
+    driver.status = 'active';
+    driver.approvedAt = new Date();
+    driver.approvedBy = req.user.id;
+    driver.rejectionReason = null;
+    await driver.save();
+
+    await Notification.create({
+      userId: driver.id,
+      title: 'Delivery Account Approved! Welcome to NOVARA Logistics',
+      message: 'Your courier account has been validated and approved. You can now accept deliveries and manage live dispatches.',
+      type: 'system'
+    });
+
+    return res.json({
+      message: 'Delivery person account approved successfully.',
+      driver: {
+        id: driver.id,
+        name: driver.name,
+        email: driver.email,
+        role: driver.role,
+        status: driver.status,
+        approvedAt: driver.approvedAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rejectDeliveryPerson = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const driver = await User.findOne({ where: { id, role: 'Delivery Person' } });
+    if (!driver) {
+      return res.status(404).json({ message: 'Delivery Person not found.' });
+    }
+
+    const rejectionReason = reason && reason.trim().length > 0
+      ? reason.trim()
+      : 'Delivery person background verification could not be completed.';
+
+    driver.status = 'rejected';
+    driver.rejectionReason = rejectionReason;
+    await driver.save();
+
+    await Notification.create({
+      userId: driver.id,
+      title: 'Delivery Application Declined',
+      message: `Your courier registration was declined. Reason: ${rejectionReason}`,
+      type: 'system'
+    });
+
+    return res.json({
+      message: 'Delivery person registration rejected.',
+      driver: {
+        id: driver.id,
+        name: driver.name,
+        email: driver.email,
+        status: driver.status,
+        rejectionReason: driver.rejectionReason
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const approveFarm = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const farm = await Farm.findByPk(id);
+    if (!farm) {
+      return res.status(404).json({ message: 'Farm not found.' });
+    }
+
+    farm.status = 'approved';
+    farm.approvedAt = new Date();
+    farm.approvedBy = req.user.id;
+    farm.rejectionReason = null;
+    await farm.save();
+
+    await Notification.create({
+      userId: farm.farmerId,
+      title: 'Farm Approved',
+      message: `Your farm '${farm.name}' has been approved by an administrator.`,
+      type: 'system'
+    });
+
+    return res.json({ message: 'Farm approved successfully.', farm });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rejectFarm = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const farm = await Farm.findByPk(id);
+    if (!farm) {
+      return res.status(404).json({ message: 'Farm not found.' });
+    }
+
+    const rejectionReason = reason && reason.trim().length > 0
+      ? reason.trim()
+      : 'Farm specifications could not be verified.';
+
+    farm.status = 'rejected';
+    farm.rejectionReason = rejectionReason;
+    await farm.save();
+
+    await Notification.create({
+      userId: farm.farmerId,
+      title: 'Farm Registration Declined',
+      message: `Your farm '${farm.name}' was not approved. Reason: ${rejectionReason}`,
+      type: 'system'
+    });
+
+    return res.json({ message: 'Farm registration rejected.', farm });
   } catch (error) {
     next(error);
   }
@@ -208,5 +468,12 @@ module.exports = {
   createUser,
   updateUser,
   setUserStatus,
+  getPendingApprovals,
+  approveFarmer,
+  rejectFarmer,
+  approveDeliveryPerson,
+  rejectDeliveryPerson,
+  approveFarm,
+  rejectFarm,
   deleteUser
 };

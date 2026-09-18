@@ -30,9 +30,21 @@ const User = sequelize.define('User', {
     defaultValue: 'Customer'
   },
   status: {
-    type: DataTypes.ENUM('active', 'suspended', 'blocked'),
+    type: DataTypes.ENUM('pending', 'active', 'rejected', 'suspended', 'blocked'),
     allowNull: false,
     defaultValue: 'active'
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  approvedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  approvedBy: {
+    type: DataTypes.UUID,
+    allowNull: true
   },
   avatarUrl: {
     type: DataTypes.STRING,

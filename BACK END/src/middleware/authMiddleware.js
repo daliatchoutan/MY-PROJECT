@@ -40,6 +40,23 @@ const authorizeRoles = (...roles) => {
         message: `Forbidden. Role '${req.user?.role}' is not authorized to perform this action.` 
       });
     }
+
+    // Farmers and Delivery Persons who are pending or rejected must not access protected business routes
+    if (req.userModel && req.userModel.status === 'pending') {
+      return res.status(403).json({ 
+        message: 'Your account is pending administrator approval.',
+        accountStatus: 'pending'
+      });
+    }
+
+    if (req.userModel && req.userModel.status === 'rejected') {
+      return res.status(403).json({ 
+        message: 'Your registration was rejected by an administrator.',
+        accountStatus: 'rejected',
+        rejectionReason: req.userModel.rejectionReason
+      });
+    }
+
     next();
   };
 };

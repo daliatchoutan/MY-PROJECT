@@ -68,14 +68,18 @@ app.use((req, res, next) => {
 // Global Error Handler
 app.use(errorHandler);
 
-// Database Sync and Server Startup
 const startServer = async () => {
   try {
+    const { ensureDatabaseExists } = require('./src/config/database');
+    if (ensureDatabaseExists) {
+      await ensureDatabaseExists();
+    }
+
     await sequelize.authenticate();
     console.log(' Database connection established successfully.');
 
-    // Sync database models (alter existing tables in dev mode)
-    await sequelize.sync({ alter: true });
+    // Sync database models safely
+    await sequelize.sync();
     console.log(' Database models synchronized.');
 
     app.listen(port, () => {

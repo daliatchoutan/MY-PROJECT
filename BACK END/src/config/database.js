@@ -34,9 +34,26 @@ const ensureDatabaseExists = async () => {
       }
     };
 
-    await safeAddColumn('Users', 'status', "ENUM('active', 'suspended', 'blocked') NOT NULL DEFAULT 'active'");
+    await safeAddColumn('Users', 'status', "ENUM('pending', 'active', 'rejected', 'suspended', 'blocked') NOT NULL DEFAULT 'active'");
+    // In case column exists with old enum, modify it safely
+    try {
+      await connection.query("ALTER TABLE `Users` MODIFY COLUMN `status` ENUM('pending', 'active', 'rejected', 'suspended', 'blocked') NOT NULL DEFAULT 'active'");
+    } catch (e) {}
+
+    await safeAddColumn('Users', 'rejectionReason', 'TEXT NULL');
+    await safeAddColumn('Users', 'approvedAt', 'DATETIME NULL');
+    await safeAddColumn('Users', 'approvedBy', 'CHAR(36) NULL');
     await safeAddColumn('Users', 'avatarUrl', 'VARCHAR(255) NULL');
     await safeAddColumn('Users', 'lastLoginAt', 'DATETIME NULL');
+
+    await safeAddColumn('Farms', 'status', "ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved'");
+    try {
+      await connection.query("ALTER TABLE `Farms` MODIFY COLUMN `status` ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved'");
+      await connection.query("UPDATE `Farms` SET `status` = 'approved' WHERE `status` IS NULL OR `status` = ''");
+    } catch (e) {}
+    await safeAddColumn('Farms', 'rejectionReason', 'TEXT NULL');
+    await safeAddColumn('Farms', 'approvedAt', 'DATETIME NULL');
+    await safeAddColumn('Farms', 'approvedBy', 'CHAR(36) NULL');
 
     await safeAddColumn('Orders', 'currency', "VARCHAR(255) DEFAULT 'FCFA'");
     await safeAddColumn('Orders', 'paymentStatus', "ENUM('pending', 'paid', 'failed') DEFAULT 'pending'");
@@ -56,13 +73,11 @@ const ensureDatabaseExists = async () => {
   }
 };
 
-ensureDatabaseExists();
-
 const sequelize = new Sequelize(dbName, user, password, {
   host,
   port,
   dialect: 'mysql',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  logging: false,
   pool: {
     max: 5,
     min: 0,
@@ -72,3 +87,4 @@ const sequelize = new Sequelize(dbName, user, password, {
 });
 
 module.exports = sequelize;
+module.exports.ensureDatabaseExists = ensureDatabaseExists;

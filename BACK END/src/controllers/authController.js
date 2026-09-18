@@ -3,10 +3,17 @@ const { User } = require('../models');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role, phone, address, avatarUrl } = req.body;
+    const { name, email, password, role, phone, address, avatarUrl, farmName, farmLocation, farmCapacity } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
+    }
+
+    // STRICT ROLE LOCKDOWN: Administrator cannot be registered through public registration
+    if (role && (role.toLowerCase().includes('admin') || role === 'Administrator')) {
+      return res.status(403).json({
+        message: 'Creating an Administrator account via public registration is prohibited.'
+      });
     }
 
     const existingUser = await User.findOne({ where: { email } });
@@ -14,18 +21,60 @@ const register = async (req, res, next) => {
       return res.status(400).json({ message: 'Email is already registered.' });
     }
 
-    const validRoles = ['Administrator', 'Farmer', 'Customer', 'Delivery Person'];
-    const assignedRole = validRoles.includes(role) ? role : 'Customer';
+    const validPublicRoles = ['Customer', 'Farmer', 'Delivery Person'];
+    const assignedRole = validPublicRoles.includes(role) ? role : 'Customer';
+
+    // Role-specific initial status
+    // Customer accounts are active immediately
+    // Farmer and Delivery Person accounts require Administrator approval
+    let initialStatus = 'active';
+    if (assignedRole === 'Farmer' || assignedRole === 'Delivery Person') {
+      initialStatus = 'pending';
+    }
 
     const user = await User.create({
       name,
       email,
       password,
       role: assignedRole,
+      status: initialStatus,
       phone,
       address,
       avatarUrl
     });
+
+    let createdFarm = null;
+    // If Farmer, auto-create their farm record with status pending
+    if (assignedRole === 'Farmer') {
+      const { Farm } = require('../models');
+      createdFarm = await Farm.create({
+        name: farmName && farmName.trim().length > 0 ? farmName.trim() : `${name}'s Poultry Farm`,
+        location: farmLocation && farmLocation.trim().length > 0 ? farmLocation.trim() : (address || 'Local Facility'),
+        capacity: farmCapacity ? parseInt(farmCapacity) : 500,
+        currentPoultryCount: 0,
+        farmerId: user.id,
+        status: 'pending'
+      });
+    }
+
+    // Notify administrators of pending registration
+    if (initialStatus === 'pending') {
+      try {
+        const { Notification } = require('../models');
+        const admins = await User.findAll({ where: { role: 'Administrator' } });
+        for (const admin of admins) {
+          await Notification.create({
+            userId: admin.id,
+            title: `New ${assignedRole} Registration Pending`,
+            message: `${name} (${email}) has registered as a ${assignedRole} and is awaiting your approval.`,
+            type: 'system',
+            isRead: false
+          });
+        }
+      } catch (notifErr) {
+        console.error('Error creating admin notification for pending registration:', notifErr.message);
+      }
+    }
 
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
@@ -33,8 +82,12 @@ const register = async (req, res, next) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
+    const message = initialStatus === 'pending'
+      ? `Registration submitted successfully. Your ${assignedRole} account is pending administrator approval.`
+      : 'User registered successfully on NOVARA';
+
     return res.status(201).json({
-      message: 'User registered successfully on NOVARA',
+      message,
       token,
       user: {
         id: user.id,
@@ -44,7 +97,8 @@ const register = async (req, res, next) => {
         status: user.status,
         avatarUrl: user.avatarUrl,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        farm: createdFarm
       }
     });
   } catch (error) {
@@ -96,6 +150,7 @@ const login = async (req, res, next) => {
         email: user.email,
         role: user.role,
         status: user.status,
+        rejectionReason: user.rejectionReason,
         avatarUrl: user.avatarUrl,
         phone: user.phone,
         address: user.address
@@ -108,8 +163,10 @@ const login = async (req, res, next) => {
 
 const getProfile = async (req, res, next) => {
   try {
+    const { Farm } = require('../models');
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      include: [{ model: Farm, as: 'farms' }]
     });
 
     if (!user) {

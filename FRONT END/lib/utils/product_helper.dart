@@ -9,10 +9,19 @@ class ProductHelper {
     BoxFit fit = BoxFit.cover,
   }) {
     final imageUrl = product != null ? (product['imageUrl'] as String?) : null;
+    String? resolvedUrl = imageUrl;
+    final nameLower = (product != null ? product['name'] ?? '' : '').toString().toLowerCase();
+    final descLower = (product != null ? product['description'] ?? '' : '').toString().toLowerCase();
+    final isBrown = nameLower.contains('brown') || nameLower.contains('brun') || descLower.contains('brown') || descLower.contains('brun');
+
+    if (isBrown && (resolvedUrl == null || resolvedUrl.contains('product_eggs.jpg'))) {
+      resolvedUrl = '/uploads/products/product_brown_eggs.jpg';
+    }
+
     final fallbackAsset = getProductImage(product);
 
-    if (imageUrl != null && imageUrl.trim().isNotEmpty) {
-      final fullUrl = ApiConfig.getImageUrl(imageUrl);
+    if (resolvedUrl != null && resolvedUrl.trim().isNotEmpty) {
+      final fullUrl = ApiConfig.getImageUrl(resolvedUrl);
       return Image.network(
         fullUrl,
         width: width,
@@ -36,6 +45,7 @@ class ProductHelper {
       fit: fit,
     );
   }
+
   static String getProductImage(dynamic product) {
     if (product == null) return 'assets/images/product_chicken.jpg';
 
@@ -45,6 +55,9 @@ class ProductHelper {
 
     // 1. Strict Category Matching First
     if (cat.contains('egg') || cat.contains('oeuf')) {
+      if (name.contains('brown') || name.contains('brun') || desc.contains('brown') || desc.contains('brun')) {
+        return 'assets/images/product_brown_eggs.jpg';
+      }
       return 'assets/images/product_eggs.jpg';
     }
 
@@ -61,6 +74,9 @@ class ProductHelper {
 
     // 2. Keyword-Based Name & Description Matching
     if (name.contains('egg') || name.contains('oeuf') || name.contains('tray') || desc.contains('table eggs') || desc.contains('laying eggs')) {
+      if (name.contains('brown') || name.contains('brun') || desc.contains('brown') || desc.contains('brun')) {
+        return 'assets/images/product_brown_eggs.jpg';
+      }
       return 'assets/images/product_eggs.jpg';
     }
 

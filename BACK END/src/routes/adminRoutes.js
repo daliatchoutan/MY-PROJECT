@@ -15,4 +15,13 @@ router.put('/users/:id', adminController.updateUser);
 router.put('/users/:id/status', adminController.setUserStatus);
 router.delete('/users/:id', adminController.deleteUser);
 
+// Pending approvals and approval workflow
+router.get('/pending-approvals', adminController.getPendingApprovals);
+router.put('/farmers/:id/approve', adminController.approveFarmer);
+router.put('/farmers/:id/reject', adminController.rejectFarmer);
+router.put('/deliveries/:id/approve', adminController.approveDeliveryPerson);
+router.put('/deliveries/:id/reject', adminController.rejectDeliveryPerson);
+router.put('/farms/:id/approve', adminController.approveFarm);
+router.put('/farms/:id/reject', adminController.rejectFarm);
+
 module.exports = router;

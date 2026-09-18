@@ -189,11 +189,18 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
       'unit': 'kg',
     },
     {
-      'name': 'Fresh Farm Eggs Tray',
+      'name': 'Organic Brown Eggs Tray (30 Eggs)',
+      'category': 'Eggs',
+      'url': '/uploads/products/product_brown_eggs.jpg',
+      'asset': 'assets/images/product_brown_eggs.jpg',
+      'unit': 'tray',
+    },
+    {
+      'name': 'Fresh Farm Eggs Basket',
       'category': 'Eggs',
       'url': '/uploads/products/product_eggs.jpg',
       'asset': 'assets/images/product_eggs.jpg',
-      'unit': 'tray',
+      'unit': 'crate',
     },
     {
       'name': 'Poultry Cuts & Fillets',

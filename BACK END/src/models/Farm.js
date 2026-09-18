@@ -23,6 +23,22 @@ const Farm = sequelize.define('Farm', {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
+  status: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending'
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  approvedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  approvedBy: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
   farmerId: {
     type: DataTypes.UUID,
     allowNull: false

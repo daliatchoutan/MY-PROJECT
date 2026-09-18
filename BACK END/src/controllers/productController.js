@@ -23,6 +23,9 @@ const getDefaultBackendImage = (category, name) => {
 
   // 1. Strict category checks first
   if (cat.includes('egg') || cat.includes('oeuf') || n.includes('egg') || n.includes('oeuf')) {
+    if (n.includes('brown') || n.includes('brun')) {
+      return '/uploads/products/product_brown_eggs.jpg';
+    }
     return '/uploads/products/product_eggs.jpg';
   }
   if (cat.includes('feed') || cat.includes('aliment') || cat.includes('provende') || n.includes('feed') || n.includes('mash')) {
@@ -211,7 +214,8 @@ const getProductTemplates = async (req, res, next) => {
       { name: 'Day-Old Chicks', category: 'Live Poultry', imageUrl: '/uploads/products/product_chicks.jpg', defaultPrice: 700, unit: 'chick' },
       { name: 'Mature Rooster', category: 'Live Poultry', imageUrl: '/uploads/products/product_rooster.jpg', defaultPrice: 6500, unit: 'bird' },
       { name: 'Farm-Fresh Whole Chicken', category: 'Poultry Meat', imageUrl: '/uploads/products/product_fresh_chicken.jpg', defaultPrice: 4000, unit: 'kg' },
-      { name: 'Fresh Farm Eggs Tray', category: 'Eggs', imageUrl: '/uploads/products/product_eggs.jpg', defaultPrice: 2200, unit: 'tray' },
+      { name: 'Organic Brown Eggs Tray (30 Eggs)', category: 'Eggs', imageUrl: '/uploads/products/product_brown_eggs.jpg', defaultPrice: 3500, unit: 'tray' },
+      { name: 'Fresh Farm Eggs Basket', category: 'Eggs', imageUrl: '/uploads/products/product_eggs.jpg', defaultPrice: 2200, unit: 'crate' },
       { name: 'Poultry Cuts & Fillets', category: 'Poultry Meat', imageUrl: '/uploads/products/product_meat.jpg', defaultPrice: 3500, unit: 'kg' },
       { name: 'Nutritional Poultry Feed', category: 'Poultry Feed', imageUrl: '/uploads/products/product_feed.jpg', defaultPrice: 18500, unit: '50kg bag' },
     ];
