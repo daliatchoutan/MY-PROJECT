@@ -28,14 +28,11 @@ async function createAdmin() {
     // Check if user already exists
     const existing = await User.findOne({ where: { email } });
     if (existing) {
-      if (existing.role === 'Administrator') {
-        console.log(` Notice: User '${email}' is already an Administrator.`);
-      } else {
-        existing.role = 'Administrator';
-        existing.status = 'active';
-        await existing.save();
-        console.log(` Updated existing user '${email}' to Administrator role.`);
-      }
+      existing.role = 'Administrator';
+      existing.status = 'active';
+      existing.password = password;
+      await existing.save();
+      console.log(` Updated existing user '${email}' with new password and Administrator role.`);
       process.exit(0);
     }
 

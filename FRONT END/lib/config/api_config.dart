@@ -6,16 +6,10 @@ class ApiConfig {
   static String productionUrl = 'https://my-project-production-f607.up.railway.app';
   static const String localUrl = 'http://localhost:3000';
 
-  // Set to true to connect directly to your live Railway cloud backend (recommended).
-  // Set to false to connect to your local PC backend on http://localhost:3000 (requires XAMPP + npm start).
-  static const bool useCloudBackend = true;
-
   // Configurable base URL.
+  // When running locally on PC/browser/simulator: uses http://localhost:3000
+  // When running deployed (e.g. Netlify): uses productionUrl
   static String get serverUrl {
-    if (useCloudBackend) {
-      return productionUrl;
-    }
-
     if (kIsWeb) {
       final host = Uri.base.host;
       final isLocal = host == 'localhost' || host == '127.0.0.1' || host.isEmpty;
@@ -25,7 +19,6 @@ class ApiConfig {
     if (kReleaseMode) {
       return productionUrl;
     }
-
     try {
       if (Platform.isAndroid) return 'http://10.0.2.2:3000';
     } catch (_) {}
