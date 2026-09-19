@@ -91,6 +91,14 @@ const initDatabase = async () => {
   }
 };
 
+process.on('unhandledRejection', (err) => {
+  console.error('Process Notice (unhandledRejection):', err ? (err.message || err) : 'Unknown');
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Process Notice (uncaughtException):', err ? (err.message || err) : 'Unknown');
+});
+
 initDatabase();
 
 module.exports = app;

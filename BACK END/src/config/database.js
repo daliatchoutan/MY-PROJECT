@@ -6,11 +6,12 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const connectionUri = process.env.MYSQL_URL || process.env.DATABASE_URL;
-const host = process.env.MYSQLHOST || process.env.DB_HOST || '127.0.0.1';
+const isRailway = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_STATIC_URL || process.env.RAILWAY_GIT_COMMIT_SHA);
+const host = process.env.MYSQLHOST || (isRailway ? 'mysql.railway.internal' : (process.env.DB_HOST || '127.0.0.1'));
 const port = parseInt(process.env.MYSQLPORT || process.env.DB_PORT || '3306');
 const user = process.env.MYSQLUSER || process.env.DB_USER || 'root';
 const password = process.env.MYSQLPASSWORD || process.env.DB_PASS || '';
-const dbName = process.env.MYSQLDATABASE || process.env.DB_NAME || 'NOVARA';
+const dbName = process.env.MYSQLDATABASE || (isRailway ? 'railway' : (process.env.DB_NAME || 'NOVARA'));
 
 // Helper function to auto-create MySQL database & patch missing columns
 const ensureDatabaseExists = async () => {
