@@ -145,6 +145,7 @@ class ProductHelper {
 
   // List of distinct realistic farm backgrounds
   static final List<String> farmBackgrounds = [
+    'assets/images/farm_background.jpg', // Novara smart eco-poultry solution
     'assets/images/farm_bg_1.jpg', // Modern climate-controlled barn
     'assets/images/farm_bg_2.jpg', // Free-range pasture run
     'assets/images/farm_bg_3.jpg', // Smart automated facility

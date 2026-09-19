@@ -46,10 +46,10 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // Realistic Farm background photo
+          // Realistic Novara Smart Farm background photo
           Positioned.fill(
             child: Image.asset(
-              'assets/images/farm_bg_4.jpg',
+              'assets/images/farm_background.jpg',
               fit: BoxFit.cover,
             ),
           ),

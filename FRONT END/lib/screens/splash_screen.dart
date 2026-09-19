@@ -65,10 +65,10 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Farm background
+          // Novara Smart Farm background
           Positioned.fill(
             child: Image.asset(
-              'assets/images/farm_bg_1.jpg',
+              'assets/images/farm_background.jpg',
               fit: BoxFit.cover,
             ),
           ),
