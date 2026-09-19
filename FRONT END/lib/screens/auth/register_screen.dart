@@ -28,7 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isPasswordVisible = false;
   String _selectedRole = 'Customer';
 
-  final List<String> _roles = ['Customer', 'Farmer', 'Delivery Person', 'Administrator'];
+  final List<String> _roles = ['Customer', 'Farmer', 'Delivery Person'];
 
   @override
   void initState() {
