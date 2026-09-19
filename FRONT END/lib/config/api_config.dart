@@ -6,9 +6,16 @@ class ApiConfig {
   static String productionUrl = 'https://my-project-production-f607.up.railway.app';
   static const String localUrl = 'http://localhost:3000';
 
+  // Set to true to connect directly to your live Railway cloud backend (recommended).
+  // Set to false to connect to your local PC backend on http://localhost:3000 (requires XAMPP + npm start).
+  static const bool useCloudBackend = true;
+
   // Configurable base URL.
-  // Dynamically uses productionUrl on Netlify / any remote host, and localUrl on local development.
   static String get serverUrl {
+    if (useCloudBackend) {
+      return productionUrl;
+    }
+
     if (kIsWeb) {
       final host = Uri.base.host;
       final isLocal = host == 'localhost' || host == '127.0.0.1' || host.isEmpty;
