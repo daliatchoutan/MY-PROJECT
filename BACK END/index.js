@@ -39,7 +39,15 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Static file serving for uploaded product & farm images
 app.use('/uploads', express.static(uploadsDir));
 
-// Health Check Endpoint
+// Health Check Endpoints
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    system: 'NOVARA Smart Poultry Farm API',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'online',
