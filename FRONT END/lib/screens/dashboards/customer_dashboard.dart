@@ -603,23 +603,16 @@ class _CustomerDashboardState extends State<CustomerDashboard>
             onPressed: () =>
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart),
-                onPressed: _showCartSheet,
-              ),
-              if (cart.itemCount > 0)
-                Positioned(
-                  right: 6, top: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Color(0xFFE67E22), shape: BoxShape.circle),
-                    child: Text('${cart.itemCount}',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: cart.itemCount > 0
+                ? Badge.count(
+                    count: cart.itemCount,
+                    backgroundColor: const Color(0xFFE67E22),
+                    child: const Icon(Icons.shopping_cart),
+                  )
+                : const Icon(Icons.shopping_cart),
+            tooltip: 'Cart',
+            onPressed: _showCartSheet,
           ),
           IconButton(
             icon: const Icon(Icons.notifications),

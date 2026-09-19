@@ -197,30 +197,14 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
             onPressed: _loadDeliveries,
           ),
           IconButton(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.notifications),
-                if (_unreadNotifsCount > 0)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Text(
-                        '$_unreadNotifsCount',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            icon: _unreadNotifsCount > 0
+                ? Badge.count(
+                    count: _unreadNotifsCount,
+                    backgroundColor: Colors.red,
+                    child: const Icon(Icons.notifications),
+                  )
+                : const Icon(Icons.notifications),
+            tooltip: 'Notifications',
             onPressed: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NotificationsScreen()),

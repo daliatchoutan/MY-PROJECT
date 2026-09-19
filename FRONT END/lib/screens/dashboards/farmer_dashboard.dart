@@ -863,39 +863,308 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   void _toggleAutoMode(String deviceId, bool currentAutoMode) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final res = await auth.api.toggleAutoMode(deviceId, !currentAutoMode);
-    if (!mounted) return;
-    scaffoldMessenger.showSnackBar(
-      SnackBar(content: Text(res['message'] ?? 'Mode updated')),
-    );
-    _loadFarmerData();
+    try {
+      final res = await auth.api.toggleAutoMode(deviceId, !currentAutoMode);
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Mode updated'), backgroundColor: const Color(0xFF0D7A57)),
+      );
+      _loadFarmerData();
+    } catch (e) {
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error toggling mode: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _triggerManualOverride(String deviceId, String action) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final res = await auth.api.manualOverride(deviceId, action);
-    if (!mounted) return;
-    scaffoldMessenger.showSnackBar(
-      SnackBar(content: Text(res['message'] ?? 'Override command executed'), backgroundColor: Colors.amber.shade900),
-    );
+    try {
+      final res = await auth.api.manualOverride(deviceId, action);
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Override command executed'), backgroundColor: Colors.amber.shade900),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error executing command: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _simulateTelemetry(String deviceSerial) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final res = await auth.api.sendTelemetry({
-      'deviceSerial': deviceSerial,
-      'foodLevel': 15.0, // Low -> triggers dispenser
-      'waterLevel': 85.0,
-      'temperature': 34.5, // High -> triggers fan
-      'humidity': 60.0,
-    });
-    if (!mounted) return;
-    scaffoldMessenger.showSnackBar(
-      SnackBar(content: Text('Telemetry sent! Triggers: ${res['automationTriggers']?.length ?? 0}')),
+    try {
+      final res = await auth.api.sendTelemetry({
+        'deviceSerial': deviceSerial,
+        'foodLevel': 15.0, // Low -> triggers dispenser
+        'waterLevel': 85.0,
+        'temperature': 34.5, // High -> triggers fan
+        'humidity': 60.0,
+      });
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Telemetry sent! Triggers: ${res['automationTriggers']?.length ?? 0}'),
+          backgroundColor: const Color(0xFF0D7A57),
+        ),
+      );
+      _loadFarmerData();
+    } catch (e) {
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error simulating telemetry: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _showAlertDetailsDialog(dynamic item) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                item['title'] ?? (locale.isFrench ? 'Alerte Sanitaire' : 'Health Alert'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(item['message'] ?? '', style: const TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+            if (item['createdAt'] != null)
+              Text(
+                '${locale.isFrench ? 'Date' : 'Time'}: ${item['createdAt'].toString().replaceFirst('T', ' ').substring(0, 19)}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                if (item['id'] != null) {
+                  await auth.api.markNotificationAsRead(item['id'].toString());
+                }
+              } catch (_) {}
+              if (ctx.mounted) Navigator.pop(ctx);
+              _loadFarmerData();
+            },
+            icon: const Icon(Icons.check, size: 16),
+            label: Text(locale.isFrench ? 'Marquer comme lu' : 'Acknowledge'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D7A57),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
-    _loadFarmerData();
+  }
+
+  void _showOrderDetailsDialog(dynamic o) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final items = (o['items'] as List<dynamic>?) ?? [];
+    final delivery = o['delivery'];
+    final driverName = delivery?['deliveryPerson']?['name'];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.receipt_long, color: Color(0xFF0D7A57)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Order #${o['id'].toString().substring(0, 8)}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Customer: ${o['customer']?['name'] ?? 'Customer'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (o['customer']?['phone'] != null)
+                  Text('Phone: ${o['customer']?['phone']}', style: const TextStyle(color: Colors.grey)),
+                if (o['shippingAddress'] != null)
+                  Text('Shipping Address: ${o['shippingAddress']}', style: const TextStyle(color: Colors.grey)),
+                const Divider(),
+                const Text('Items Ordered:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                if (items.isEmpty)
+                  const Text('No item details available.', style: TextStyle(fontStyle: FontStyle.italic))
+                else
+                  ...items.map((it) {
+                    final pName = it['product']?['name'] ?? 'Product';
+                    final qty = it['quantity'] ?? 1;
+                    final price = it['unitPrice'] ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('$qty x $pName'),
+                          Text('${price * qty} FCFA', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    );
+                  }),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Amount:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('${o['totalAmount']} FCFA', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0D7A57))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('Payment: ${o['paymentStatus']?.toString().toUpperCase()} | Status: ${o['status']?.toString().toUpperCase()}'),
+                if (driverName != null)
+                  Text('Courier: $driverName (${delivery?['status'] ?? 'unassigned'})', style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showAssignDeliveryDialog(delivery?['id']?.toString() ?? o['id'].toString());
+            },
+            icon: const Icon(Icons.delivery_dining, size: 16),
+            label: Text(driverName == null ? (locale.isFrench ? 'Assigner livreur' : 'Assign Courier') : (locale.isFrench ? 'Réassigner' : 'Reassign Courier')),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple.shade700, foregroundColor: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteProduct(dynamic p) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(locale.isFrench ? 'Supprimer le produit' : 'Delete Product'),
+        content: Text(
+          locale.isFrench
+              ? 'Voulez-vous vraiment supprimer "${p['name']}" ?'
+              : 'Are you sure you want to delete "${p['name']}" from your inventory?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(locale.isFrench ? 'Annuler' : 'Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await auth.api.deleteProduct(p['id']);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (!mounted) return;
+                _loadFarmerData();
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(locale.isFrench ? 'Produit supprimé' : 'Product deleted successfully'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: Text(locale.isFrench ? 'Supprimer' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFarmDetailsDialog(dynamic f) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final devCount = f['devices']?.length ?? 0;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.agriculture, color: Color(0xFF0D7A57)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(f['name'] ?? 'Farm', style: const TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('📍 Location: ${f['location'] ?? 'N/A'}'),
+            const SizedBox(height: 6),
+            Text('🐔 Poultry Capacity: ${f['currentPoultryCount'] ?? 0} / ${f['capacity'] ?? 0} birds'),
+            const SizedBox(height: 6),
+            Text('📡 Connected IoT Clusters: $devCount'),
+            if (f['status'] != null) ...[
+              const SizedBox(height: 6),
+              Text('Status: ${f['status'].toString().toUpperCase()}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: f['status'] == 'approved' ? Colors.green : Colors.orange,
+                  )),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showEditFarmDialog(f);
+            },
+            icon: const Icon(Icons.edit, size: 16),
+            label: Text(locale.tr('edit_farm')),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _tabController.animateTo(1); // Switch to IoT tab
+            },
+            icon: const Icon(Icons.sensors, size: 16),
+            label: const Text('View IoT'),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D7A57), foregroundColor: Colors.white),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -932,28 +1201,25 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
             ),
           ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                ).then((_) => _loadFarmerData()),
-              ),
-              if (unreadNotifs > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Color(0xFFE67E22), shape: BoxShape.circle),
-                    child: Text(
-                      '$unreadNotifs',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            tooltip: locale.isFrench ? 'Alertes & Notifications' : 'Alerts & Notifications',
+            icon: Badge.count(
+              count: unreadNotifs,
+              isLabelVisible: unreadNotifs > 0,
+              backgroundColor: const Color(0xFFE67E22),
+              child: const Icon(Icons.notifications),
+            ),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+              _loadFarmerData();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: locale.isFrench ? 'Actualiser' : 'Refresh Dashboard',
+            onPressed: _loadFarmerData,
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -1005,106 +1271,129 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
         backgroundColor: const Color(0xFF0D7A57),
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: _farms.isEmpty
-          ? Center(child: Text(locale.isFrench ? 'Aucune ferme enregistrée. Cliquez sur + pour ajouter.' : 'No farms registered yet. Click + to add your poultry farm.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _farms.length,
-              itemBuilder: (ctx, idx) {
-                final f = _farms[idx];
-                final farmBg = ProductHelper.getFarmBackground(idx);
+      body: RefreshIndicator(
+        onRefresh: _loadFarmerData,
+        child: _farms.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        locale.isFrench
+                            ? 'Aucune ferme enregistrée. Cliquez sur + pour ajouter.'
+                            : 'No farms registered yet. Click + to add your poultry farm.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: _farms.length,
+                itemBuilder: (ctx, idx) {
+                  final f = _farms[idx];
+                  final farmBg = ProductHelper.getFarmBackground(idx);
 
-                return Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Farm header banner with unique realistic background photo
-                      Container(
-                        height: 95,
-                        decoration: BoxDecoration(
-                          image: DecorationImage(
-                            image: AssetImage(farmBg),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.black.withValues(alpha: 0.1), Colors.black.withValues(alpha: 0.70)],
+                  return Card(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _showFarmDetailsDialog(f),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Farm header banner with unique realistic background photo
+                          Container(
+                            height: 95,
+                            decoration: BoxDecoration(
+                              image: DecorationImage(
+                                image: AssetImage(farmBg),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [Colors.black.withValues(alpha: 0.1), Colors.black.withValues(alpha: 0.70)],
+                                ),
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              alignment: Alignment.bottomLeft,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    f['name'] ?? 'Farm',
+                                    style: const TextStyle(
+                                      color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,
+                                      shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0D7A57),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${f['devices']?.length ?? 0} IoT Clusters',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          padding: const EdgeInsets.all(12),
-                          alignment: Alignment.bottomLeft,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                f['name'] ?? 'Farm',
-                                style: const TextStyle(
-                                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,
-                                  shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0D7A57),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${f['devices']?.length ?? 0} IoT Clusters',
-                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('📍 ${f['location'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                            const SizedBox(height: 4),
-                            Text('🐔 ${locale.tr('capacity')}: ${f['currentPoultryCount'] ?? 0} / ${f['capacity'] ?? 0} birds'),
-                            const Divider(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                          Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                OutlinedButton.icon(
-                                  onPressed: () => _showEditFarmDialog(f),
-                                  icon: const Icon(Icons.edit, size: 16),
-                                  label: Text(locale.tr('edit_farm')),
-                                  style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.blue.shade700,
-                                      side: BorderSide(color: Colors.blue.shade700)),
-                                ),
-                                const SizedBox(width: 8),
-                                OutlinedButton.icon(
-                                  onPressed: () => _confirmDeleteFarm(f),
-                                  icon: const Icon(Icons.delete_outline, size: 16),
-                                  label: Text(locale.tr('delete_farm')),
-                                  style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                      side: const BorderSide(color: Colors.red)),
+                                Text('📍 ${f['location'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                                const SizedBox(height: 4),
+                                Text('🐔 ${locale.tr('capacity')}: ${f['currentPoultryCount'] ?? 0} / ${f['capacity'] ?? 0} birds'),
+                                const Divider(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () => _showEditFarmDialog(f),
+                                      icon: const Icon(Icons.edit, size: 16),
+                                      label: Text(locale.tr('edit_farm')),
+                                      style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.blue.shade700,
+                                          side: BorderSide(color: Colors.blue.shade700)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    OutlinedButton.icon(
+                                      onPressed: () => _confirmDeleteFarm(f),
+                                      icon: const Icon(Icons.delete_outline, size: 16),
+                                      label: Text(locale.tr('delete_farm')),
+                                      style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                          side: const BorderSide(color: Colors.red)),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 
@@ -1189,133 +1478,143 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
         backgroundColor: Colors.green.shade700,
         child: const Icon(Icons.add_location_alt, color: Colors.white),
       ),
-      body: _devices.isEmpty
-          ? const Center(child: Text('No IoT devices registered.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _devices.length,
-              itemBuilder: (ctx, idx) {
-                final d = _devices[idx];
-                final reading = _liveReadings[d['id']] ?? {};
+      body: RefreshIndicator(
+        onRefresh: _loadFarmerData,
+        child: _devices.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                  const Center(child: Text('No IoT devices registered. Pull down to refresh or click + to add.')),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: _devices.length,
+                itemBuilder: (ctx, idx) {
+                  final d = _devices[idx];
+                  final reading = _liveReadings[d['id']] ?? {};
 
-                final food = reading['foodLevel'] ?? 50.0;
-                final water = reading['waterLevel'] ?? 75.0;
-                final temp = reading['temperature'] ?? 24.5;
-                final humidity = reading['humidity'] ?? 65.0;
-                final isAuto = d['autoMode'] ?? true;
-                final healthStatus = d['healthStatus'] ?? 'good';
+                  final food = reading['foodLevel'] ?? 50.0;
+                  final water = reading['waterLevel'] ?? 75.0;
+                  final temp = reading['temperature'] ?? 24.5;
+                  final humidity = reading['humidity'] ?? 65.0;
+                  final isAuto = d['autoMode'] ?? true;
+                  final healthStatus = d['healthStatus'] ?? 'good';
 
-                return Card(
-                  elevation: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(d['name'] ?? 'Device Cluster', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                Text(d['deviceSerial'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                              ],
-                            ),
-                            Chip(
-                              label: Text('Health: ${healthStatus.toUpperCase()}'),
-                              backgroundColor: healthStatus == 'good' ? Colors.green.shade100 : Colors.orange.shade100,
-                            ),
-                          ],
-                        ),
-                        const Divider(),
-                        // Auto vs Manual Toggle Switch
-                        Container(
-                          color: isAuto ? Colors.green.shade50 : Colors.amber.shade50,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          child: Row(
+                  return Card(
+                    elevation: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                isAuto ? '🤖 AUTOMATIC THRESHOLD CONTROL' : '⚙️ MANUAL OVERRIDE CONTROL',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: isAuto ? Colors.green.shade900 : Colors.amber.shade900,
-                                ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(d['name'] ?? 'Device Cluster', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                  Text(d['deviceSerial'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                ],
                               ),
-                              Switch(
-                                value: isAuto,
-                                activeThumbColor: Colors.green,
-                                onChanged: (val) => _toggleAutoMode(d['id'], isAuto),
+                              Chip(
+                                label: Text('Health: ${healthStatus.toUpperCase()}'),
+                                backgroundColor: healthStatus == 'good' ? Colors.green.shade100 : Colors.orange.shade100,
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(child: _buildGaugeCard('Water Level', '${water.toStringAsFixed(1)}%', Icons.water_drop, water < (d['waterThreshold'] ?? 20) ? Colors.red : Colors.blue)),
-                            Expanded(child: _buildGaugeCard('Temperature', '${temp.toStringAsFixed(1)}°C', Icons.thermostat, Colors.orange)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(child: _buildGaugeCard('Food Level', '${food.toStringAsFixed(1)}%', Icons.restaurant, food < (d['foodThreshold'] ?? 20) ? Colors.red : Colors.green)),
-                            Expanded(child: _buildGaugeCard('Humidity', '${humidity.toStringAsFixed(1)}%', Icons.water, Colors.teal)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => _showSensorHistoryDialog(d['id'], d['name']),
-                              icon: const Icon(Icons.history),
-                              label: const Text('Review Sensor Log'),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () => _simulateTelemetry(d['deviceSerial']),
-                              icon: const Icon(Icons.sensors),
-                              label: const Text('Simulate Telemetry'),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
-                            ),
-                          ],
-                        ),
-                        if (!isAuto) ...[
                           const Divider(),
-                          const Text('Manual Actuator Controls:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                          // Auto vs Manual Toggle Switch
+                          Container(
+                            color: isAuto ? Colors.green.shade50 : Colors.amber.shade50,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isAuto ? '🤖 AUTOMATIC THRESHOLD CONTROL' : '⚙️ MANUAL OVERRIDE CONTROL',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: isAuto ? Colors.green.shade900 : Colors.amber.shade900,
+                                  ),
+                                ),
+                                Switch(
+                                  value: isAuto,
+                                  activeThumbColor: Colors.green,
+                                  onChanged: (val) => _toggleAutoMode(d['id'], isAuto),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
                             children: [
-                              ElevatedButton(
-                                onPressed: () => _triggerManualOverride(d['id'], 'FEEDER_ON'),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade800, foregroundColor: Colors.white),
-                                child: const Text('Trigger Feeder'),
+                              Expanded(child: _buildGaugeCard('Water Level', '${water.toStringAsFixed(1)}%', Icons.water_drop, water < (d['waterThreshold'] ?? 20) ? Colors.red : Colors.blue)),
+                              Expanded(child: _buildGaugeCard('Temperature', '${temp.toStringAsFixed(1)}°C', Icons.thermostat, Colors.orange)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: _buildGaugeCard('Food Level', '${food.toStringAsFixed(1)}%', Icons.restaurant, food < (d['foodThreshold'] ?? 20) ? Colors.red : Colors.green)),
+                              Expanded(child: _buildGaugeCard('Humidity', '${humidity.toStringAsFixed(1)}%', Icons.water, Colors.teal)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextButton.icon(
+                                onPressed: () => _showSensorHistoryDialog(d['id'], d['name']),
+                                icon: const Icon(Icons.history),
+                                label: const Text('Review Sensor Log'),
                               ),
-                              ElevatedButton(
-                                onPressed: () => _triggerManualOverride(d['id'], 'WATER_VALVE_ON'),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800, foregroundColor: Colors.white),
-                                child: const Text('Open Water Valve'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => _triggerManualOverride(d['id'], 'FAN_ON'),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade800, foregroundColor: Colors.white),
-                                child: const Text('Activate Cooling Fan'),
+                              ElevatedButton.icon(
+                                onPressed: () => _simulateTelemetry(d['deviceSerial']),
+                                icon: const Icon(Icons.sensors),
+                                label: const Text('Simulate Telemetry'),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
                               ),
                             ],
                           ),
+                          if (!isAuto) ...[
+                            const Divider(),
+                            const Text('Manual Actuator Controls:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () => _triggerManualOverride(d['id'], 'FEEDER_ON'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade800, foregroundColor: Colors.white),
+                                  child: const Text('Trigger Feeder'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => _triggerManualOverride(d['id'], 'WATER_VALVE_ON'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800, foregroundColor: Colors.white),
+                                  child: const Text('Open Water Valve'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => _triggerManualOverride(d['id'], 'FAN_ON'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade800, foregroundColor: Colors.white),
+                                  child: const Text('Activate Cooling Fan'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
+      ),
     );
   }
 
@@ -1337,25 +1636,108 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   }
 
   Widget _buildAiAlertsTab() {
+    final locale = Provider.of<LocaleProvider>(context);
     final aiNotifs = _notifications.where((n) => n['type'] == 'ai_alert').toList();
-    return aiNotifs.isEmpty
-        ? const Center(child: Text('No AI health anomaly warnings reported.'))
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: aiNotifs.length,
-            itemBuilder: (ctx, idx) {
-              final item = aiNotifs[idx];
+    final allNotifsCount = _notifications.length;
+
+    return RefreshIndicator(
+      onRefresh: _loadFarmerData,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Responsive Quick-Action Banner to open Notifications Screen
+          Card(
+            color: const Color(0xFF0D7A57).withValues(alpha: 0.08),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFF0D7A57), width: 1)),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications_active, color: Color(0xFF0D7A57), size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          locale.isFrench ? 'Centre d\'alertes et notifications' : 'Alert & Notification Center',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        Text(
+                          locale.isFrench ? '$allNotifsCount notification(s) au total' : '$allNotifsCount total notifications recorded',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      );
+                      _loadFarmerData();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D7A57),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    child: Text(locale.isFrench ? 'Voir tout' : 'View All'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (aiNotifs.isEmpty)
+            Card(
+              elevation: 0,
+              color: Colors.green.shade50,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      locale.isFrench ? 'Tout va bien dans vos élevages !' : 'All Flocks Healthy!',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      locale.isFrench
+                          ? 'Aucune anomalie sanitaire détectée par le modèle IA.'
+                          : 'No health anomalies or disease risk detected by the AI monitoring system.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...aiNotifs.map((item) {
               return Card(
                 color: Colors.red.shade50,
                 margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.warning, color: Colors.white)),
-                  title: Text(item['title'] ?? 'AI Health Alert', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(item['message'] ?? ''),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.red.shade200)),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _showAlertDetailsDialog(item),
+                  child: ListTile(
+                    leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.warning, color: Colors.white)),
+                    title: Text(item['title'] ?? 'AI Health Alert', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(item['message'] ?? ''),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.red),
+                  ),
                 ),
               );
-            },
-          );
+            }),
+        ],
+      ),
+    );
   }
 
   Widget _buildProductsTab() {
@@ -1365,163 +1747,189 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
         backgroundColor: Colors.green.shade700,
         child: const Icon(Icons.add_shopping_cart, color: Colors.white),
       ),
-      body: _products.isEmpty
-          ? const Center(child: Text('No inventory products listed.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _products.length,
-              itemBuilder: (ctx, idx) {
-                final p = _products[idx];
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  child: ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: ProductHelper.buildProductImage(
-                        p,
-                        width: 54,
-                        height: 54,
-                        fit: BoxFit.cover,
+      body: RefreshIndicator(
+        onRefresh: _loadFarmerData,
+        child: _products.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                  const Center(child: Text('No inventory products listed. Pull down to refresh or click + to add.')),
+                ],
+              )
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: _products.length,
+                itemBuilder: (ctx, idx) {
+                  final p = _products[idx];
+                  return Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _showEditProductDialog(p),
+                      child: ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: ProductHelper.buildProductImage(
+                            p,
+                            width: 54,
+                            height: 54,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                p['name'] ?? 'Product',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D7A57).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                p['category'] ?? '',
+                                style: const TextStyle(color: Color(0xFF0D7A57), fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 2),
+                            Text(
+                              '${p['price']} FCFA | Stock: ${p['stockQuantity']} ${p['unit']}',
+                              style: const TextStyle(color: Color(0xFF0D7A57), fontWeight: FontWeight.bold),
+                            ),
+                            if (p['imageUrl'] != null && (p['imageUrl'] as String).isNotEmpty)
+                              Text(
+                                p['imageUrl'].toString().contains('product_') && !p['imageUrl'].toString().contains('/uploads/products/product_')
+                                    ? 'Uploaded photo'
+                                    : 'Backend image',
+                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.teal),
+                              tooltip: 'Edit product & image',
+                              onPressed: () => _showEditProductDialog(p),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: 'Delete product',
+                              onPressed: () => _confirmDeleteProduct(p),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            p['name'] ?? 'Product',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+
+  Widget _buildOrdersTab() {
+    final locale = Provider.of<LocaleProvider>(context);
+    return RefreshIndicator(
+      onRefresh: _loadFarmerData,
+      child: _orders.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                Center(child: Text(locale.isFrench ? 'Aucune commande reçue pour le moment.' : 'No customer orders received yet.')),
+              ],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: _orders.length,
+              itemBuilder: (ctx, idx) {
+                final o = _orders[idx];
+                final delivery = o['delivery'];
+                final driverName = delivery?['deliveryPerson']?['name'];
+
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _showOrderDetailsDialog(o),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Order #${o['id'].toString().substring(0, 8)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              PopupMenuButton<String>(
+                                onSelected: (status) async {
+                                  final auth = Provider.of<AuthProvider>(context, listen: false);
+                                  await auth.api.updateOrderStatus(o['id'], status);
+                                  _loadFarmerData();
+                                },
+                                itemBuilder: (ctx) => ['accepted', 'rejected', 'in_transit', 'delivered']
+                                    .map((s) => PopupMenuItem(value: s, child: Text(s)))
+                                    .toList(),
+                                child: IgnorePointer(
+                                  child: Chip(
+                                    label: Text('${o['status']}'.toUpperCase(), style: const TextStyle(fontSize: 11)),
+                                    backgroundColor: Colors.green.shade50,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0D7A57).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
+                          const SizedBox(height: 4),
+                          Text('Customer: ${o['customer']?['name'] ?? 'Customer'} | Total: ${o['totalAmount']} FCFA'),
+                          Text('Payment: ${o['paymentStatus']} | Delivery Status: ${delivery?['status'] ?? 'unassigned'}'),
+                          if (driverName != null) Text('Assigned Courier: $driverName'),
+                          const Divider(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _showAssignDeliveryDialog(delivery?['id']?.toString() ?? o['id'].toString()),
+                                icon: const Icon(Icons.delivery_dining, size: 16),
+                                label: Text(
+                                  driverName == null
+                                      ? (locale.isFrench ? 'Assigner un livreur' : 'Assign Courier')
+                                      : (locale.isFrench ? 'Réassigner: $driverName' : 'Reassign: $driverName'),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            p['category'] ?? '',
-                            style: const TextStyle(color: Color(0xFF0D7A57), fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 2),
-                        Text(
-                          '${p['price']} FCFA | Stock: ${p['stockQuantity']} ${p['unit']}',
-                          style: const TextStyle(color: Color(0xFF0D7A57), fontWeight: FontWeight.bold),
-                        ),
-                        if (p['imageUrl'] != null && (p['imageUrl'] as String).isNotEmpty)
-                          Text(
-                            p['imageUrl'].toString().contains('product_') && !p['imageUrl'].toString().contains('/uploads/products/product_')
-                                ? 'Uploaded photo'
-                                : 'Backend image',
-                            style: const TextStyle(fontSize: 10, color: Colors.grey),
-                          ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.teal),
-                          tooltip: 'Edit product & image',
-                          onPressed: () => _showEditProductDialog(p),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          tooltip: 'Delete product',
-                          onPressed: () async {
-                            final auth = Provider.of<AuthProvider>(context, listen: false);
-                            await auth.api.deleteProduct(p['id']);
-                            _loadFarmerData();
-                          },
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
               },
             ),
     );
-  }
-
-  Widget _buildOrdersTab() {
-    final locale = Provider.of<LocaleProvider>(context);
-    return _orders.isEmpty
-        ? Center(child: Text(locale.isFrench ? 'Aucune commande reçue pour le moment.' : 'No customer orders received yet.'))
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _orders.length,
-            itemBuilder: (ctx, idx) {
-              final o = _orders[idx];
-              final delivery = o['delivery'];
-              final driverName = delivery?['deliveryPerson']?['name'];
-
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Order #${o['id'].toString().substring(0, 8)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          PopupMenuButton<String>(
-                            onSelected: (status) async {
-                              final auth = Provider.of<AuthProvider>(context, listen: false);
-                              await auth.api.updateOrderStatus(o['id'], status);
-                              _loadFarmerData();
-                            },
-                            itemBuilder: (ctx) => ['accepted', 'rejected', 'in_transit', 'delivered']
-                                .map((s) => PopupMenuItem(value: s, child: Text(s)))
-                                .toList(),
-                            child: Chip(
-                              label: Text('${o['status']}'.toUpperCase(), style: const TextStyle(fontSize: 11)),
-                              backgroundColor: Colors.green.shade50,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Customer: ${o['customer']?['name'] ?? 'Customer'} | Total: ${o['totalAmount']} FCFA'),
-                      Text('Payment: ${o['paymentStatus']} | Delivery Status: ${delivery?['status'] ?? 'unassigned'}'),
-                      if (driverName != null) Text('Assigned Courier: $driverName'),
-                      const Divider(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _showAssignDeliveryDialog(delivery?['id']?.toString() ?? o['id'].toString()),
-                            icon: const Icon(Icons.delivery_dining, size: 16),
-                            label: Text(
-                              driverName == null
-                                  ? (locale.isFrench ? 'Assigner un livreur' : 'Assign Courier')
-                                  : (locale.isFrench ? 'Réassigner: $driverName' : 'Reassign: $driverName'),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple.shade700,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
   }
 
   void _showAssignDeliveryDialog(String deliveryOrOrderId) async {
