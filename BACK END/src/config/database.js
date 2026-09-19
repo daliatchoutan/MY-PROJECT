@@ -5,6 +5,7 @@ const path = require('path');
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+const connectionUri = process.env.MYSQL_URL || process.env.DATABASE_URL;
 const host = process.env.MYSQLHOST || process.env.DB_HOST || '127.0.0.1';
 const port = parseInt(process.env.MYSQLPORT || process.env.DB_PORT || '3306');
 const user = process.env.MYSQLUSER || process.env.DB_USER || 'root';
@@ -16,12 +17,20 @@ const ensureDatabaseExists = async () => {
   try {
     let connection;
     try {
-      connection = await mysql.createConnection({ host, port, user, password });
-      await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
-      await connection.changeUser({ database: dbName });
-    } catch (connErr) {
-      // In cloud environments like Railway/Aiven, connect directly to the pre-created database
-      connection = await mysql.createConnection({ host, port, user, password, database: dbName });
+      if (connectionUri) {
+        connection = await mysql.createConnection(connectionUri);
+      } else {
+        try {
+          connection = await mysql.createConnection({ host, port, user, password });
+          await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
+          await connection.changeUser({ database: dbName });
+        } catch (connErr) {
+          connection = await mysql.createConnection({ host, port, user, password, database: dbName });
+        }
+      }
+    } catch (createErr) {
+      console.log('Notice: Connecting directly to database without root create rights.');
+      return;
     }
 
     // Check and add missing columns for existing MySQL tables
@@ -79,18 +88,29 @@ const ensureDatabaseExists = async () => {
   }
 };
 
-const sequelize = new Sequelize(dbName, user, password, {
-  host,
-  port,
-  dialect: 'mysql',
-  logging: false,
-  pool: {
-    max: 5,
-    min: 0,
-    acquire: 30000,
-    idle: 10000
-  }
-});
+const sequelize = connectionUri
+  ? new Sequelize(connectionUri, {
+      dialect: 'mysql',
+      logging: false,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+      }
+    })
+  : new Sequelize(dbName, user, password, {
+      host,
+      port,
+      dialect: 'mysql',
+      logging: false,
+      pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+      }
+    });
 
 module.exports = sequelize;
 module.exports.ensureDatabaseExists = ensureDatabaseExists;

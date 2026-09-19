@@ -68,7 +68,12 @@ app.use((req, res, next) => {
 // Global Error Handler
 app.use(errorHandler);
 
-const startServer = async () => {
+// Start server immediately so cloud orchestrators (Railway/Render) detect healthy port
+const server = app.listen(port, () => {
+  console.log(` Smart Poultry Farm Backend listening on port ${port}`);
+});
+
+const initDatabase = async () => {
   try {
     const { ensureDatabaseExists } = require('./src/config/database');
     if (ensureDatabaseExists) {
@@ -81,15 +86,11 @@ const startServer = async () => {
     // Sync database models safely
     await sequelize.sync();
     console.log(' Database models synchronized.');
-
-    app.listen(port, () => {
-      console.log(` Smart Poultry Farm Backend listening on port ${port}`);
-    });
   } catch (error) {
-    console.error(' Failed to start server:', error);
+    console.error(' Database initialization notice:', error.message);
   }
 };
 
-startServer();
+initDatabase();
 
 module.exports = app;
