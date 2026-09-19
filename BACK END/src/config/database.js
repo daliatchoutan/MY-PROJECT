@@ -5,18 +5,24 @@ const path = require('path');
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const host = process.env.DB_HOST || '127.0.0.1';
-const port = parseInt(process.env.DB_PORT || '3306');
-const user = process.env.DB_USER || 'root';
-const password = process.env.DB_PASS || '';
-const dbName = process.env.DB_NAME || 'NOVARA';
+const host = process.env.MYSQLHOST || process.env.DB_HOST || '127.0.0.1';
+const port = parseInt(process.env.MYSQLPORT || process.env.DB_PORT || '3306');
+const user = process.env.MYSQLUSER || process.env.DB_USER || 'root';
+const password = process.env.MYSQLPASSWORD || process.env.DB_PASS || '';
+const dbName = process.env.MYSQLDATABASE || process.env.DB_NAME || 'NOVARA';
 
 // Helper function to auto-create MySQL database & patch missing columns
 const ensureDatabaseExists = async () => {
   try {
-    const connection = await mysql.createConnection({ host, port, user, password });
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
-    await connection.changeUser({ database: dbName });
+    let connection;
+    try {
+      connection = await mysql.createConnection({ host, port, user, password });
+      await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
+      await connection.changeUser({ database: dbName });
+    } catch (connErr) {
+      // In cloud environments like Railway/Aiven, connect directly to the pre-created database
+      connection = await mysql.createConnection({ host, port, user, password, database: dbName });
+    }
 
     // Check and add missing columns for existing MySQL tables
     const safeAddColumn = async (table, column, definition) => {
