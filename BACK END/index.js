@@ -68,6 +68,18 @@ app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Backup Seed Endpoint (restores users, farms, products, devices if needed)
+app.all('/api/seed-backup', async (req, res) => {
+  try {
+    const { autoSeedBackup } = require('./src/config/seedBackup');
+    const force = req.query.force === 'true' || req.body?.force === true;
+    const result = await autoSeedBackup(force);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 404 Handler
 app.use((req, res, next) => {
   res.status(404).json({ message: `Route '${req.originalUrl}' not found.` });
@@ -94,6 +106,10 @@ const initDatabase = async () => {
     // Sync database models safely
     await sequelize.sync();
     console.log(' Database models synchronized.');
+
+    // Auto-seed pre-existing data from backup
+    const { autoSeedBackup } = require('./src/config/seedBackup');
+    await autoSeedBackup();
   } catch (error) {
     console.error(' Database initialization notice:', error.message);
   }
