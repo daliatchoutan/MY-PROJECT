@@ -33,12 +33,14 @@ const ensureDatabaseExists = async () => {
       return;
     }
 
+    const currentDb = connection.config?.database || dbName;
+
     // Check and add missing columns for existing MySQL tables
     const safeAddColumn = async (table, column, definition) => {
       try {
         const [rows] = await connection.query(
           `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-          [dbName, table, column]
+          [currentDb, table, column]
         );
         if (rows.length === 0) {
           await connection.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);

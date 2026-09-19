@@ -69,8 +69,8 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 // Start server immediately so cloud orchestrators (Railway/Render) detect healthy port
-const server = app.listen(port, () => {
-  console.log(` Smart Poultry Farm Backend listening on port ${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(` Smart Poultry Farm Backend listening on 0.0.0.0:${port}`);
 });
 
 const initDatabase = async () => {
