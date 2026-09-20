@@ -71,36 +71,99 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     final nameCtrl = TextEditingController();
     final locCtrl = TextEditingController();
     final capCtrl = TextEditingController(text: '1000');
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add New Poultry Farm'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Farm Name')),
-            TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location / Region')),
-            TextField(controller: capCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Max Poultry Capacity')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add New Poultry Farm'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Farm Name *',
+                  hintText: 'e.g. Green Valley Farm',
+                ),
+              ),
+              TextField(
+                controller: locCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Location / Region *',
+                  hintText: 'e.g. Yaounde, Obala',
+                ),
+              ),
+              TextField(
+                controller: capCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Max Poultry Capacity'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final location = locCtrl.text.trim();
+                      if (name.isEmpty || location.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Farm Name and Location are required.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isSaving = true);
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                      try {
+                        await auth.api.createFarm({
+                          'name': name,
+                          'location': location,
+                          'capacity': int.tryParse(capCtrl.text) ?? 1000,
+                        });
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Farm created successfully!'),
+                            backgroundColor: Color(0xFF0D7A57),
+                          ),
+                        );
+                        if (!mounted) return;
+                        _loadFarmerData();
+                      } catch (err) {
+                        setDialogState(() => isSaving = false);
+                        final errMsg = err.toString().replaceAll('Exception: ', '');
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text(errMsg),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    },
+              child: isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save Farm'),
+            )
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final auth = Provider.of<AuthProvider>(context, listen: false);
-              await auth.api.createFarm({
-                'name': nameCtrl.text,
-                'location': locCtrl.text,
-                'capacity': int.tryParse(capCtrl.text) ?? 1000,
-              });
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (!mounted) return;
-              _loadFarmerData();
-            },
-            child: const Text('Save Farm'),
-          )
-        ],
       ),
     );
   }
