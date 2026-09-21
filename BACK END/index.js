@@ -39,19 +39,11 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Static file serving for uploaded product & farm images
 app.use('/uploads', express.static(uploadsDir));
 
-// Health Check Endpoints
-app.get('/', (req, res) => {
-  res.json({
-    status: 'online',
-    system: 'NOVARA Smart Poultry Farm API',
-    timestamp: new Date().toISOString()
-  });
-});
-
+// Health Check Endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'online',
-    system: 'Smart Poultry Farm Automation API',
+    system: 'NOVARA Smart Poultry Farm Automation API',
     timestamp: new Date().toISOString()
   });
 });
@@ -80,7 +72,29 @@ app.all('/api/seed-backup', async (req, res) => {
   }
 });
 
-// 404 Handler
+// Flutter Web Application Static Serving & SPA Routing
+const publicWebDir = path.join(__dirname, 'public');
+if (fs.existsSync(publicWebDir)) {
+  app.use(express.static(publicWebDir));
+
+  // Express 5 SPA fallback: Return index.html for non-API, non-upload GET requests
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+      return res.sendFile(path.join(publicWebDir, 'index.html'));
+    }
+    next();
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.json({
+      status: 'online',
+      system: 'NOVARA Smart Poultry Farm API',
+      timestamp: new Date().toISOString()
+    });
+  });
+}
+
+// 404 Handler for undefined API routes
 app.use((req, res, next) => {
   res.status(404).json({ message: `Route '${req.originalUrl}' not found.` });
 });

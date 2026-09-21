@@ -13,7 +13,9 @@
     "test:products": "mocha test/products/product.test.js --no-config --exit",
     "test:orders": "mocha test/orders/order.test.js --no-config --exit",
     "test:deliveries": "mocha test/deliveries/delivery.test.js --no-config --exit",
-    "test:users": "mocha test/users/user.test.js --no-config --exit"
+    "test:users": "mocha test/users/user.test.js --no-config --exit",
+    "sync:web": "node -e \"const fs=require('fs'); if(fs.existsSync('../FRONT END/build/web')){ fs.cpSync('../FRONT END/build/web', './public', {recursive:true}); console.log('Web artifacts synced to public/'); }\"",
+    "build:web": "npm run sync:web"
   },
   "keywords": [],
   "author": "",
