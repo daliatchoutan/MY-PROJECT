@@ -125,19 +125,6 @@ if (fs.existsSync(publicWebDir)) {
   });
 }
 
-// 404 Handler for undefined API routes
-app.use((req, res, next) => {
-  res.status(404).json({ message: `Route '${req.originalUrl}' not found.` });
-});
-
-// Global Error Handler
-app.use(errorHandler);
-
-// Start server immediately so cloud orchestrators (Railway/Render) detect healthy port
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(` Smart Poultry Farm Backend listening on 0.0.0.0:${port}`);
-});
-
 // Dedicated Endpoint to Ensure Administrator Ben Exists
 app.all('/api/setup-admin', async (req, res) => {
   try {
@@ -171,6 +158,19 @@ app.all('/api/setup-admin', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// 404 Handler for undefined API routes
+app.use((req, res, next) => {
+  res.status(404).json({ message: `Route '${req.originalUrl}' not found.` });
+});
+
+// Global Error Handler
+app.use(errorHandler);
+
+// Start server immediately so cloud orchestrators (Railway/Render) detect healthy port
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(` Smart Poultry Farm Backend listening on 0.0.0.0:${port}`);
 });
 
 const initDatabase = async () => {
