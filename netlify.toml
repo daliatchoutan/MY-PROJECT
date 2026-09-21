@@ -1,0 +1,29 @@
+# Netlify Configuration for NOVARA Smart Poultry Farm
+
+[build]
+  # Serve the tracked compiled Flutter web application from BACK END/public
+  publish = "BACK END/public"
+
+# SPA Fallback for Flutter client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/canvaskit/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "*.wasm"
+  [headers.values]
+    Content-Type = "application/wasm"
