@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/locale_provider.dart';
 import '../widgets/language_switcher.dart';
+import '../services/update_service.dart';
 import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
 import 'visitor_marketplace_screen.dart';
@@ -42,6 +43,10 @@ class WelcomeScreen extends StatelessWidget {
     final auth = Provider.of<AuthProvider>(context);
     final locale = Provider.of<LocaleProvider>(context);
     final screenHeight = MediaQuery.of(context).size.height;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkForUpdates(context);
+    });
 
     return Scaffold(
       body: Stack(

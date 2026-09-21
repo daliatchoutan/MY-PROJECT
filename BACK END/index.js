@@ -72,14 +72,45 @@ app.all('/api/seed-backup', async (req, res) => {
   }
 });
 
+// App Version check for automated in-app OTA updates
+app.get('/api/app/version', (req, res) => {
+  const versionInfo = {
+    appName: 'NOVARA Smart Poultry Farm',
+    version: '1.0.1',
+    buildNumber: 2,
+    releaseNotes: '• Simplified Farmer Registration without upfront farm requirement\n• Enhanced order delivery traceability & status indicators\n• Instant CNI & verification tracking on profile\n• Automated in-app update system',
+    apkDownloadUrl: `${req.protocol}://${req.get('host')}/download/novara-latest.apk`,
+    webAppUrl: 'https://novara-poultry.netlify.app/',
+    forceUpdate: false,
+    updatedAt: new Date().toISOString()
+  };
+  res.json(versionInfo);
+});
+
+// Dedicated APK download endpoint
+const downloadDir = path.join(__dirname, 'public', 'download');
+if (!fs.existsSync(downloadDir)) {
+  fs.mkdirSync(downloadDir, { recursive: true });
+}
+app.get('/download/novara-latest.apk', (req, res) => {
+  const apkPath = path.join(downloadDir, 'novara-latest.apk');
+  if (fs.existsSync(apkPath)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="NOVARA-SmartPoultry.apk"');
+    return res.sendFile(apkPath);
+  }
+  return res.status(404).json({ error: 'APK release file is currently being built. Please check back shortly.' });
+});
+app.use('/download', express.static(downloadDir));
+
 // Flutter Web Application Static Serving & SPA Routing
 const publicWebDir = path.join(__dirname, 'public');
 if (fs.existsSync(publicWebDir)) {
   app.use(express.static(publicWebDir));
 
-  // Express 5 SPA fallback: Return index.html for non-API, non-upload GET requests
+  // Express 5 SPA fallback: Return index.html for non-API, non-upload, non-download GET requests
   app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/download')) {
       return res.sendFile(path.join(publicWebDir, 'index.html'));
     }
     next();

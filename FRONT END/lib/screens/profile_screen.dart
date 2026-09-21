@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/update_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -201,7 +202,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: const Text('Address / Location'),
                       subtitle: Text(user['address'] ?? 'Not set'),
                     ),
+                    if (user['cniNumber'] != null) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.credit_card_outlined),
+                        title: const Text('CNI / National ID'),
+                        subtitle: Text(user['cniNumber']),
+                      ),
+                    ],
+                    if (user['farmerId'] != null) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.agriculture),
+                        title: const Text('Farmer ID'),
+                        subtitle: Text(user['farmerId']),
+                      ),
+                    ],
+                    if (user['deliveryPersonId'] != null) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.two_wheeler),
+                        title: const Text('Courier ID'),
+                        subtitle: Text(user['deliveryPersonId']),
+                      ),
+                    ],
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: const Icon(Icons.system_update_outlined, color: Color(0xFF0D7A57)),
+                  title: const Text('Check for App Updates', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Installed: v1.0.1 (Build 2)'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => UpdateService.checkForUpdates(context, showNoUpdateSnack: true),
                 ),
               ),
             ],

@@ -2,11 +2,12 @@
 setlocal enabledelayedexpansion
 
 echo ========================================================
-echo   NOVARA - Automated Web Build ^& Production Deployment
+echo   NOVARA - Automated Multi-Platform Build & Deploy
+echo   (Web App, Android APK, Railway API, Netlify)
 echo ========================================================
 echo.
 
-echo [1/4] Building Flutter Web Release...
+echo [1/5] Building Flutter Web Release...
 cd /d "%~dp0FRONT END"
 call flutter build web --release
 if %errorlevel% neq 0 (
@@ -15,23 +16,31 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/4] Syncing Web Artifacts to Backend Public Folder...
-cd /d "%~dp0"
-if exist "BACK END\public" rmdir /s /q "BACK END\public"
-xcopy /s /e /y /i "FRONT END\build\web" "BACK END\public"
+echo [2/5] Building Android Release APK...
+call flutter build apk --release
 if %errorlevel% neq 0 (
-    echo [ERROR] Failed to copy web artifacts to BACK END\public.
+    echo [ERROR] Flutter Android APK compilation failed.
     exit /b %errorlevel%
 )
 
 echo.
-echo [3/4] Staging and Committing Changes to Git...
+echo [3/5] Syncing Web Artifacts & APK to Backend Public Folder...
+cd /d "%~dp0"
+if not exist "BACK END\public" mkdir "BACK END\public"
+xcopy /s /e /y /i "FRONT END\build\web\*" "BACK END\public\"
+
+if not exist "BACK END\public\download" mkdir "BACK END\public\download"
+copy /y "FRONT END\build\app\outputs\flutter-apk\app-release.apk" "BACK END\public\download\novara-latest.apk"
+echo /* /index.html 200 > "BACK END\public\_redirects"
+
+echo.
+echo [4/5] Staging and Committing Changes to Git...
 git add .
-set COMMIT_MSG=deploy: update web version and production backend [%date% %time%]
+set COMMIT_MSG=deploy: update Web & Android APK release [%date% %time%]
 git commit -m "%COMMIT_MSG%"
 
 echo.
-echo [4/4] Pushing to GitHub (Triggers Railway ^& GitHub Pages Auto-Deploy)...
+echo [5/5] Pushing to GitHub (Triggers Railway & Netlify Deployments)...
 git push origin main
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to push to GitHub. Check your network or credentials.
@@ -40,9 +49,10 @@ if %errorlevel% neq 0 (
 
 echo.
 echo ========================================================
-echo   SUCCESS! Deployment Initiated Automatically!
-echo   - Railway Backend ^& Web: https://my-project-production-f607.up.railway.app/
-echo   - GitHub Actions CI/CD: https://github.com/daliatchoutan/MY-PROJECT/actions
-echo   - GitHub Pages Web:     https://daliatchoutan.github.io/MY-PROJECT/
+echo   SUCCESS! NOVARA Multi-Platform Deployment Initiated!
+echo   - Netlify Web App:    https://novara-poultry.netlify.app/
+echo   - Railway API & Web:  https://my-project-production-f607.up.railway.app/
+echo   - Android APK Direct: https://my-project-production-f607.up.railway.app/download/novara-latest.apk
+echo   - In-App OTA Update:  Active (Users are automatically notified to update)
 echo ========================================================
 pause

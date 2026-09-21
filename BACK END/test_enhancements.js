@@ -311,6 +311,15 @@ async function runTests() {
     assert(traceRes.delivery.order.items[0].product.farm.farmer.farmerId === farmerRes.user.farmerId, 'Farmer trace present');
     assert(traceRes.delivery.deliveryPerson.deliveryPersonId === driverRes.user.deliveryPersonId, 'Delivery person and vehicle trace present');
 
+    // [Test 7: Automated OTA App Version Endpoint]
+    console.log('\n[Test 7: Automated OTA App Version Endpoint]');
+    const versionReq = await fetch(`${baseUrl}/api/app/version`);
+    const versionData = await versionReq.json();
+    assert(versionReq.status === 200, 'App version endpoint returned HTTP 200');
+    assert(versionData.version === '1.0.1', `Server version is 1.0.1 (got ${versionData.version})`);
+    assert(versionData.buildNumber === 2, `Server buildNumber is 2 (got ${versionData.buildNumber})`);
+    assert(versionData.apkDownloadUrl !== undefined && versionData.apkDownloadUrl.includes('/download/novara-latest.apk'), 'APK download URL points to /download/novara-latest.apk');
+
     console.log(`\n========================================`);
     console.log(`Results: ${passed} Passed, ${failed} Failed`);
     console.log(`========================================\n`);
