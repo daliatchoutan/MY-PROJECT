@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
@@ -7,8 +6,8 @@ class ApiConfig {
   static const String localUrl = 'http://localhost:3000';
 
   // Configurable base URL.
-  // When running locally on PC/browser/simulator: uses http://localhost:3000
-  // When running deployed (e.g. Netlify): uses productionUrl
+  // - Web: dynamically switches to localUrl when testing on localhost, productionUrl on Netlify.
+  // - Mobile (Android APK / iOS): always connects to live Railway productionUrl so APK works on all phones.
   static String get serverUrl {
     if (kIsWeb) {
       final host = Uri.base.host;
@@ -16,14 +15,8 @@ class ApiConfig {
       return isLocal ? localUrl : productionUrl;
     }
 
-    if (kReleaseMode) {
-      return productionUrl;
-    }
-    try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:3000';
-    } catch (_) {}
-
-    return localUrl;
+    // Always connect to live Railway production backend on mobile devices
+    return productionUrl;
   }
 
   static String get baseUrl => '$serverUrl/api';
