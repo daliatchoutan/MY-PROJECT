@@ -107,6 +107,41 @@ const server = app.listen(port, '0.0.0.0', () => {
   console.log(` Smart Poultry Farm Backend listening on 0.0.0.0:${port}`);
 });
 
+// Dedicated Endpoint to Ensure Administrator Ben Exists
+app.all('/api/setup-admin', async (req, res) => {
+  try {
+    const { User } = require('./src/models');
+    const adminEmail = 'ben@gmail.com';
+    let admin = await User.findOne({ where: { email: adminEmail } });
+    if (!admin) {
+      admin = await User.create({
+        name: 'Ben',
+        email: adminEmail,
+        password: '11111111',
+        role: 'Administrator',
+        status: 'active',
+        phone: '+237 600 000 001'
+      });
+      return res.json({
+        message: "Administrator account 'Ben' created successfully!",
+        user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, status: admin.status }
+      });
+    } else {
+      admin.name = 'Ben';
+      admin.role = 'Administrator';
+      admin.status = 'active';
+      admin.password = '11111111';
+      await admin.save();
+      return res.json({
+        message: "Administrator account 'Ben' updated with role Administrator and active status!",
+        user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, status: admin.status }
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 const initDatabase = async () => {
   try {
     const { ensureDatabaseExists } = require('./src/config/database');
@@ -124,6 +159,33 @@ const initDatabase = async () => {
     // Auto-seed pre-existing data from backup
     const { autoSeedBackup } = require('./src/config/seedBackup');
     await autoSeedBackup();
+
+    // Ensure requested Administrator 'Ben' exists with active status and role Administrator
+    try {
+      const { User } = require('./src/models');
+      const adminEmail = 'ben@gmail.com';
+      let admin = await User.findOne({ where: { email: adminEmail } });
+      if (!admin) {
+        await User.create({
+          name: 'Ben',
+          email: adminEmail,
+          password: '11111111',
+          role: 'Administrator',
+          status: 'active',
+          phone: '+237 600 000 001'
+        });
+        console.log(` Administrator 'Ben' (${adminEmail}) created successfully.`);
+      } else {
+        admin.name = 'Ben';
+        admin.role = 'Administrator';
+        admin.status = 'active';
+        admin.password = '11111111';
+        await admin.save();
+        console.log(` Administrator 'Ben' (${adminEmail}) verified and updated with active role.`);
+      }
+    } catch (adminErr) {
+      console.error('Notice ensuring Administrator Ben:', adminErr.message);
+    }
   } catch (error) {
     console.error(' Database initialization notice:', error.message);
   }
