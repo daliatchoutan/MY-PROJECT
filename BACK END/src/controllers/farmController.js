@@ -1,19 +1,24 @@
 const { Farm, User, Device } = require('../models');
+const { generateFarmId } = require('../utils/idGenerator');
 
 const createFarm = async (req, res, next) => {
   try {
     const { name, location, capacity, currentPoultryCount } = req.body;
     const farmerId = req.user.role === 'Administrator' && req.body.farmerId ? req.body.farmerId : req.user.id;
 
-    if (!name || !location) {
+    if (!name || !name.trim() || !location || !location.trim()) {
       return res.status(400).json({ message: 'Farm name and location are required.' });
     }
 
+    const generatedFarmId = await generateFarmId(Farm);
+
     const farm = await Farm.create({
-      name,
-      location,
-      capacity: capacity || 0,
-      currentPoultryCount: currentPoultryCount || 0,
+      farmId: generatedFarmId,
+      name: name.trim(),
+      location: location.trim(),
+      capacity: capacity ? parseInt(capacity, 10) : 0,
+      currentPoultryCount: currentPoultryCount ? parseInt(currentPoultryCount, 10) : 0,
+      status: 'approved',
       farmerId
     });
 

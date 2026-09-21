@@ -1237,6 +1237,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     final unreadNotifs = _notifications.where((n) => !(n['isRead'] ?? false)).length;
     final avatarUrl = auth.user?['avatarUrl'];
 
+    final farmerId = auth.user?['farmerId'];
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -1246,6 +1248,21 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             ),
             const SizedBox(width: 8),
             Text(locale.tr('role_farmer')),
+            if (farmerId != null && farmerId.toString().isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white54),
+                ),
+                child: Text(
+                  farmerId.toString(),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -1421,6 +1438,25 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                if (f['farmId'] != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE8F5E9),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF81C784)),
+                                    ),
+                                    child: Text(
+                                      'ID: ${f['farmId']}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF2E7D32),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                                 Text('📍 ${f['location'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.w500)),
                                 const SizedBox(height: 4),
                                 Text('🐔 ${locale.tr('capacity')}: ${f['currentPoultryCount'] ?? 0} / ${f['capacity'] ?? 0} birds'),

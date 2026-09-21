@@ -22,18 +22,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _cniController = TextEditingController();
   final _addressController = TextEditingController();
   final _avatarController = TextEditingController();
+
+  // Farmer specific
+  final _professionalLicenseController = TextEditingController();
+
+  // Delivery Person specific
+  final _driverLicenseController = TextEditingController();
+  final _vehiclePlateController = TextEditingController();
+  String _selectedVehicleType = 'Motorcycle';
+
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
   String _selectedRole = 'Customer';
 
   final List<String> _roles = ['Customer', 'Farmer', 'Delivery Person'];
+  final List<String> _vehicleTypes = ['Motorcycle', 'Car', 'Van', 'Bicycle', 'Walking / On Foot'];
 
   @override
   void initState() {
     super.initState();
     _tryAutoRecover();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    _cniController.dispose();
+    _addressController.dispose();
+    _avatarController.dispose();
+    _professionalLicenseController.dispose();
+    _driverLicenseController.dispose();
+    _vehiclePlateController.dispose();
+    super.dispose();
   }
 
   Future<void> _tryAutoRecover() async {
@@ -43,6 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _nameController.text = prefs.getString('saved_reg_name') ?? '';
         _emailController.text = prefs.getString('saved_reg_email') ?? '';
         _phoneController.text = prefs.getString('saved_reg_phone') ?? '';
+        _cniController.text = prefs.getString('saved_reg_cni') ?? '';
         _addressController.text = prefs.getString('saved_reg_address') ?? '';
         final role = prefs.getString('saved_reg_role');
         if (role != null && _roles.contains(role)) {
@@ -70,6 +100,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _nameController.text = prefs.getString('saved_reg_name') ?? _nameController.text;
       _emailController.text = prefs.getString('saved_reg_email') ?? _emailController.text;
       _phoneController.text = prefs.getString('saved_reg_phone') ?? _phoneController.text;
+      _cniController.text = prefs.getString('saved_reg_cni') ?? _cniController.text;
       _addressController.text = prefs.getString('saved_reg_address') ?? _addressController.text;
       final role = prefs.getString('saved_reg_role');
       if (role != null && _roles.contains(role)) {
@@ -87,8 +118,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await prefs.setString('saved_reg_name', _nameController.text.trim());
     await prefs.setString('saved_reg_email', _emailController.text.trim());
     await prefs.setString('saved_reg_phone', _phoneController.text.trim());
+    await prefs.setString('saved_reg_cni', _cniController.text.trim());
     await prefs.setString('saved_reg_address', _addressController.text.trim());
     await prefs.setString('saved_reg_role', _selectedRole);
+
     // Also save for One-Tap login recovery
     await prefs.setString('saved_login_email', _emailController.text.trim());
     await prefs.setString('saved_login_password', _passwordController.text);
@@ -109,8 +142,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
+      confirmPassword: _confirmPasswordController.text,
       role: _selectedRole,
       phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+      cniNumber: _cniController.text.trim().isNotEmpty ? _cniController.text.trim() : null,
+      professionalLicenseNumber: _selectedRole == 'Farmer' && _professionalLicenseController.text.trim().isNotEmpty
+          ? _professionalLicenseController.text.trim()
+          : null,
+      driverLicenseNumber: _selectedRole == 'Delivery Person' && _driverLicenseController.text.trim().isNotEmpty
+          ? _driverLicenseController.text.trim()
+          : null,
+      vehicleType: _selectedRole == 'Delivery Person' ? _selectedVehicleType : null,
+      vehiclePlateNumber: _selectedRole == 'Delivery Person' && _vehiclePlateController.text.trim().isNotEmpty
+          ? _vehiclePlateController.text.trim()
+          : null,
       address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
       avatarUrl: _avatarController.text.trim().isNotEmpty ? _avatarController.text.trim() : null,
     );
@@ -235,6 +280,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 14),
+
+                // Role-specific Information Banner
+                if (_selectedRole == 'Farmer') ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF81C784)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.agriculture, color: Color(0xFF2E7D32)),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Farmer accounts have immediate active access. You can add one or multiple poultry farms directly from your dashboard after registration.',
+                            style: TextStyle(color: Color(0xFF1B5E20), fontSize: 12, height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ] else if (_selectedRole == 'Delivery Person') ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFFB74D)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.two_wheeler, color: Color(0xFFE65100)),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Delivery accounts receive instant access to delivery jobs. Profile picture is completely optional.',
+                            style: TextStyle(color: Color(0xFFBF360C), fontSize: 12, height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                // Universal Required Fields
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -242,7 +338,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.person_outline),
                     border: const OutlineInputBorder(),
                   ),
-                  validator: (val) => val != null && val.isNotEmpty ? null : 'Name is required',
+                  validator: (val) => val != null && val.trim().isNotEmpty ? null : 'Full name is required',
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -253,7 +349,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.email_outlined),
                     border: const OutlineInputBorder(),
                   ),
-                  validator: (val) => val != null && val.contains('@') ? null : 'Valid email required',
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Email is required';
+                    if (!val.contains('@') || !val.contains('.')) return 'Enter a valid email address';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: _selectedRole == 'Customer'
+                        ? '${locale.tr('phone_number')} (Optional)'
+                        : '${locale.tr('phone_number')} *',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (val) {
+                    if (_selectedRole != 'Customer' && (val == null || val.trim().isEmpty)) {
+                      return 'Phone number is required for ${_selectedRole}s';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _cniController,
+                  decoration: InputDecoration(
+                    labelText: _selectedRole == 'Customer'
+                        ? 'CNI / National ID Card Number (Optional)'
+                        : 'CNI / National ID Card Number *',
+                    hintText: 'e.g. 1029384756',
+                    prefixIcon: const Icon(Icons.credit_card_outlined),
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (val) {
+                    if (_selectedRole != 'Customer' && (val == null || val.trim().isEmpty)) {
+                      return 'CNI / National ID Card Number is required';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
@@ -268,28 +404,109 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                     ),
                   ),
-                  validator: (val) => val != null && val.length >= 6 ? null : 'Min 6 characters',
+                  validator: (val) => val != null && val.length >= 6 ? null : 'Min 6 characters required',
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
+                  controller: _confirmPasswordController,
+                  obscureText: !_isConfirmPasswordVisible,
                   decoration: InputDecoration(
-                    labelText: locale.tr('phone_number'),
-                    prefixIcon: const Icon(Icons.phone_outlined),
+                    labelText: 'Confirm Password *',
+                    prefixIcon: const Icon(Icons.lock_reset_outlined),
                     border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(_isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+                    ),
                   ),
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return 'Please confirm your password';
+                    if (val != _passwordController.text) return 'Passwords do not match';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
-                TextFormField(
-                  controller: _addressController,
-                  decoration: InputDecoration(
-                    labelText: locale.tr('delivery_address'),
-                    prefixIcon: const Icon(Icons.location_on_outlined),
-                    border: const OutlineInputBorder(),
+
+                // FARMER SPECIFIC FIELDS
+                if (_selectedRole == 'Farmer') ...[
+                  TextFormField(
+                    controller: _professionalLicenseController,
+                    decoration: const InputDecoration(
+                      labelText: 'Professional License Number (Optional)',
+                      hintText: 'e.g. AGR-2026-9921',
+                      prefixIcon: Icon(Icons.verified_outlined),
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 14),
+                ],
+
+                // DELIVERY PERSON SPECIFIC FIELDS
+                if (_selectedRole == 'Delivery Person') ...[
+                  TextFormField(
+                    controller: _avatarController,
+                    decoration: const InputDecoration(
+                      labelText: 'Profile Picture URL (100% Optional)',
+                      hintText: 'https://... or leave empty',
+                      helperText: 'Optional - accept null or empty without any error',
+                      prefixIcon: Icon(Icons.image_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _driverLicenseController,
+                    decoration: const InputDecoration(
+                      labelText: "Driver's License Number (Optional)",
+                      hintText: 'e.g. DL-987654321',
+                      prefixIcon: Icon(Icons.drive_eta_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedVehicleType,
+                    decoration: const InputDecoration(
+                      labelText: 'Vehicle Type',
+                      prefixIcon: Icon(Icons.commute_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _vehicleTypes.map((vt) {
+                      return DropdownMenuItem(value: vt, child: Text(vt));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedVehicleType = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  if (_selectedVehicleType != 'Walking / On Foot') ...[
+                    TextFormField(
+                      controller: _vehiclePlateController,
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle License Plate Number (Optional)',
+                        hintText: 'e.g. LT 5432 AB',
+                        prefixIcon: Icon(Icons.pin_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                ],
+
+                // CUSTOMER SPECIFIC FIELDS
+                if (_selectedRole == 'Customer') ...[
+                  TextFormField(
+                    controller: _addressController,
+                    decoration: InputDecoration(
+                      labelText: locale.tr('delivery_address'),
+                      prefixIcon: const Icon(Icons.location_on_outlined),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                const SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: auth.isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(

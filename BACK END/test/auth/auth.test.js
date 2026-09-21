@@ -79,40 +79,31 @@ describe('Authentication Unit Tests', () => {
       assert.strictEqual(res.data.message, 'Email is already registered.');
     });
 
-    it('should register a Farmer with pending status and auto-create initial pending farm', async () => {
+    it('should register a Farmer with active status, CNI, and generated farmerId without auto-creating a farm', async () => {
       sinon.stub(User, 'findOne').resolves(null);
       const fakeFarmer = {
         id: 'usr-farmer-001',
         name: 'Farmer John',
         email: 'farmer.john@example.com',
         role: 'Farmer',
-        status: 'pending',
-        phone: '+237600000002',
-        address: 'Bafoussam'
+        status: 'active',
+        phone: '+237 671 234 567',
+        cniNumber: 'CNI-123456',
+        farmerId: 'NOV-FRM-00001',
+        professionalLicenseNumber: 'AGR-9988'
       };
       sinon.stub(User, 'create').resolves(fakeFarmer);
-      sinon.stub(User, 'findAll').resolves([{ id: 'admin-1' }]); // For admin notification
-      sinon.stub(Notification, 'create').resolves({});
-
-      const fakeFarm = {
-        id: 'farm-001',
-        name: 'Sunrise Poultry',
-        location: 'West Region',
-        capacity: 1500,
-        status: 'pending',
-        farmerId: 'usr-farmer-001'
-      };
-      sinon.stub(Farm, 'create').resolves(fakeFarm);
 
       const req = createMockReq({
         body: {
           name: 'Farmer John',
           email: 'farmer.john@example.com',
           password: 'Password123!',
+          confirmPassword: 'Password123!',
           role: 'Farmer',
-          farmName: 'Sunrise Poultry',
-          farmLocation: 'West Region',
-          farmCapacity: 1500
+          phone: '+237 671 234 567',
+          cniNumber: 'CNI-123456',
+          professionalLicenseNumber: 'AGR-9988'
         }
       });
       const res = createMockRes();
@@ -122,29 +113,38 @@ describe('Authentication Unit Tests', () => {
 
       assert.strictEqual(res.statusCode, 201, 'Status code should be 201 Created');
       assert.strictEqual(res.data.user.role, 'Farmer', 'Role must be Farmer');
-      assert.strictEqual(res.data.user.status, 'pending', 'Farmer account must be set to pending approval');
-      assert.strictEqual(res.data.user.farm.name, 'Sunrise Poultry', 'Auto-created farm name matched');
-      assert.strictEqual(res.data.user.farm.status, 'pending', 'Farm status must be pending');
+      assert.strictEqual(res.data.user.status, 'active', 'Farmer account must be active immediately');
+      assert.strictEqual(res.data.user.cniNumber, 'CNI-123456', 'CNI matches');
+      assert.strictEqual(res.data.user.farmerId, 'NOV-FRM-00001', 'Farmer ID matches');
     });
 
-    it('should register a Delivery Person with pending status', async () => {
+    it('should register a Delivery Person with active status, CNI, and generated deliveryPersonId', async () => {
       sinon.stub(User, 'findOne').resolves(null);
       const fakeCourier = {
         id: 'usr-courier-001',
         name: 'Speedy Express',
         email: 'speedy@example.com',
         role: 'Delivery Person',
-        status: 'pending'
+        status: 'active',
+        phone: '+237 699 876 543',
+        cniNumber: 'CNI-998877',
+        deliveryPersonId: 'NOV-DRV-00001',
+        vehicleType: 'Motorcycle',
+        vehiclePlateNumber: 'LT 1234 AB'
       };
       sinon.stub(User, 'create').resolves(fakeCourier);
-      sinon.stub(User, 'findAll').resolves([]);
 
       const req = createMockReq({
         body: {
           name: 'Speedy Express',
           email: 'speedy@example.com',
           password: 'Password123!',
-          role: 'Delivery Person'
+          confirmPassword: 'Password123!',
+          role: 'Delivery Person',
+          phone: '+237 699 876 543',
+          cniNumber: 'CNI-998877',
+          vehicleType: 'Motorcycle',
+          vehiclePlateNumber: 'LT 1234 AB'
         }
       });
       const res = createMockRes();
@@ -154,7 +154,9 @@ describe('Authentication Unit Tests', () => {
 
       assert.strictEqual(res.statusCode, 201, 'Status code should be 201 Created');
       assert.strictEqual(res.data.user.role, 'Delivery Person', 'Role must be Delivery Person');
-      assert.strictEqual(res.data.user.status, 'pending', 'Delivery Person status must be pending');
+      assert.strictEqual(res.data.user.status, 'active', 'Delivery Person status must be active');
+      assert.strictEqual(res.data.user.cniNumber, 'CNI-998877', 'CNI matches');
+      assert.strictEqual(res.data.user.deliveryPersonId, 'NOV-DRV-00001', 'Driver ID matches');
     });
 
     it('should reject attempts to register as ADMIN or Administrator with HTTP 403', async () => {

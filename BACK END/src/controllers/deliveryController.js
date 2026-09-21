@@ -1,11 +1,82 @@
-const { Delivery, Order, User, Notification } = require('../models');
+const { Delivery, Order, User, Notification, OrderItem, Product, Farm } = require('../models');
 const bcrypt = require('bcryptjs');
+
+// Traceability helper include
+const deliveryTraceabilityInclude = [
+  {
+    model: Order,
+    as: 'order',
+    include: [
+      { model: User, as: 'customer', attributes: ['id', 'name', 'phone', 'email', 'address'] },
+      {
+        model: OrderItem,
+        as: 'items',
+        include: [
+          {
+            model: Product,
+            as: 'product',
+            attributes: ['id', 'name', 'category', 'price', 'imageUrl'],
+            include: [
+              {
+                model: Farm,
+                as: 'farm',
+                attributes: ['id', 'farmId', 'name', 'location'],
+                include: [
+                  {
+                    model: User,
+                    as: 'farmer',
+                    attributes: ['id', 'name', 'phone', 'email', 'farmerId']
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    model: User,
+    as: 'deliveryPerson',
+    attributes: [
+      'id',
+      'name',
+      'phone',
+      'email',
+      'avatarUrl',
+      'deliveryPersonId',
+      'driverLicenseNumber',
+      'vehicleType',
+      'vehiclePlateNumber'
+    ]
+  }
+];
+
+const getDeliveryById = async (req, res, next) => {
+  try {
+    const delivery = await Delivery.findByPk(req.params.id, {
+      include: deliveryTraceabilityInclude
+    });
+
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery record not found.' });
+    }
+
+    if (req.user.role === 'Delivery Person' && delivery.deliveryPersonId !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden. This delivery is not assigned to you.' });
+    }
+
+    return res.json({ delivery });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const getAvailableDrivers = async (req, res, next) => {
   try {
     let drivers = await User.findAll({
       where: { role: 'Delivery Person' },
-      attributes: ['id', 'name', 'email', 'phone', 'avatarUrl', 'status']
+      attributes: ['id', 'name', 'email', 'phone', 'avatarUrl', 'status', 'deliveryPersonId', 'vehicleType', 'vehiclePlateNumber']
     });
 
     // If none exist yet, automatically seed a default active Courier
@@ -17,7 +88,10 @@ const getAvailableDrivers = async (req, res, next) => {
         password: hashedPassword,
         role: 'Delivery Person',
         status: 'active',
-        phone: '+237 670 123 456'
+        phone: '+237 670 123 456',
+        deliveryPersonId: 'NOV-DRV-00001',
+        vehicleType: 'Motorcycle',
+        vehiclePlateNumber: 'LT 1234 XY'
       });
       drivers = [newDriver];
     }
@@ -94,12 +168,9 @@ const assignDelivery = async (req, res, next) => {
       });
     }
 
-    // Reload with associations
+    // Reload with full traceability associations
     const updatedDelivery = await Delivery.findByPk(delivery.id, {
-      include: [
-        { model: Order, as: 'order', include: [{ model: User, as: 'customer', attributes: ['id', 'name', 'phone'] }] },
-        { model: User, as: 'deliveryPerson', attributes: ['id', 'name', 'phone', 'email'] }
-      ]
+      include: deliveryTraceabilityInclude
     });
 
     return res.json({ message: 'Delivery assigned successfully', delivery: updatedDelivery });
@@ -249,10 +320,7 @@ const getMyDeliveries = async (req, res, next) => {
 
     const deliveries = await Delivery.findAll({
       where: whereClause,
-      include: [
-        { model: Order, as: 'order', include: [{ model: User, as: 'customer', attributes: ['id', 'name', 'phone'] }] },
-        { model: User, as: 'deliveryPerson', attributes: ['id', 'name', 'phone'] }
-      ],
+      include: deliveryTraceabilityInclude,
       order: [['createdAt', 'DESC']]
     });
 
@@ -268,5 +336,6 @@ module.exports = {
   updateDeliveryStatus,
   reportDelayedDelivery,
   confirmDelivery,
-  getMyDeliveries
+  getMyDeliveries,
+  getDeliveryById
 };

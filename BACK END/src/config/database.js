@@ -63,7 +63,15 @@ const ensureDatabaseExists = async () => {
     await safeAddColumn('Users', 'approvedBy', 'CHAR(36) NULL');
     await safeAddColumn('Users', 'avatarUrl', 'VARCHAR(255) NULL');
     await safeAddColumn('Users', 'lastLoginAt', 'DATETIME NULL');
+    await safeAddColumn('Users', 'cniNumber', 'VARCHAR(255) NULL UNIQUE');
+    await safeAddColumn('Users', 'farmerId', 'VARCHAR(64) NULL UNIQUE');
+    await safeAddColumn('Users', 'professionalLicenseNumber', 'VARCHAR(255) NULL');
+    await safeAddColumn('Users', 'deliveryPersonId', 'VARCHAR(64) NULL UNIQUE');
+    await safeAddColumn('Users', 'driverLicenseNumber', 'VARCHAR(255) NULL');
+    await safeAddColumn('Users', 'vehicleType', 'VARCHAR(64) NULL');
+    await safeAddColumn('Users', 'vehiclePlateNumber', 'VARCHAR(64) NULL');
 
+    await safeAddColumn('Farms', 'farmId', 'VARCHAR(64) NULL UNIQUE');
     await safeAddColumn('Farms', 'status', "ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved'");
     try {
       await connection.query("ALTER TABLE `Farms` MODIFY COLUMN `status` ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved'");

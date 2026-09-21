@@ -54,6 +54,37 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  cniNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
+  farmerId: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    unique: true
+  },
+  professionalLicenseNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  deliveryPersonId: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    unique: true
+  },
+  driverLicenseNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  vehicleType: {
+    type: DataTypes.STRING(64),
+    allowNull: true
+  },
+  vehiclePlateNumber: {
+    type: DataTypes.STRING(64),
+    allowNull: true
+  },
   address: {
     type: DataTypes.TEXT,
     allowNull: true

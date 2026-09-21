@@ -1,80 +1,99 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { generateFarmerId, generateDeliveryPersonId } = require('../utils/idGenerator');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, role, phone, address, avatarUrl, farmName, farmLocation, farmCapacity } = req.body;
+    const {
+      name,
+      email,
+      password,
+      confirmPassword,
+      role,
+      phone,
+      cniNumber,
+      professionalLicenseNumber,
+      driverLicenseNumber,
+      vehicleType,
+      vehiclePlateNumber,
+      address,
+      avatarUrl
+    } = req.body;
 
+    // Basic required fields
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
     }
 
+    // Password confirmation validation if provided
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match.' });
+    }
+
     // STRICT ROLE LOCKDOWN: Administrator cannot be registered through public registration
-    if (role && (role.toLowerCase().includes('admin') || role === 'Administrator')) {
+    if (role && (role.toLowerCase().includes('admin') || role.trim().toLowerCase() === 'administrator')) {
       return res.status(403).json({
         message: 'Creating an Administrator account via public registration is prohibited.'
       });
     }
 
-    const existingUser = await User.findOne({ where: { email } });
+    const validPublicRoles = ['Customer', 'Farmer', 'Delivery Person'];
+    const assignedRole = validPublicRoles.includes(role) ? role : 'Customer';
+
+    // Farmer and Delivery Person require CNI & phone
+    if ((assignedRole === 'Farmer' || assignedRole === 'Delivery Person') && (!cniNumber || !cniNumber.trim())) {
+      return res.status(400).json({ message: 'CNI / National ID Card Number is required.' });
+    }
+
+    if ((assignedRole === 'Farmer' || assignedRole === 'Delivery Person') && (!phone || !phone.trim())) {
+      return res.status(400).json({ message: 'Phone number is required.' });
+    }
+
+    // Check unique email
+    const existingUser = await User.findOne({ where: { email: email.trim().toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({ message: 'Email is already registered.' });
     }
 
-    const validPublicRoles = ['Customer', 'Farmer', 'Delivery Person'];
-    const assignedRole = validPublicRoles.includes(role) ? role : 'Customer';
-
-    // Role-specific initial status
-    // Customer accounts are active immediately
-    // Farmer and Delivery Person accounts require Administrator approval
-    let initialStatus = 'active';
-    if (assignedRole === 'Farmer' || assignedRole === 'Delivery Person') {
-      initialStatus = 'pending';
+    // Check unique CNI if provided
+    const cleanCni = cniNumber ? cniNumber.trim() : null;
+    if (cleanCni) {
+      const existingCni = await User.findOne({ where: { cniNumber: cleanCni } });
+      if (existingCni) {
+        return res.status(400).json({ message: 'CNI / National ID Card Number is already registered.' });
+      }
     }
 
+    // Generate unique system IDs for Farmer and Delivery Person
+    let generatedFarmerId = null;
+    let generatedDeliveryPersonId = null;
+
+    if (assignedRole === 'Farmer') {
+      generatedFarmerId = await generateFarmerId(User);
+    } else if (assignedRole === 'Delivery Person') {
+      generatedDeliveryPersonId = await generateDeliveryPersonId(User);
+    }
+
+    // Status is active immediately for all normal roles (Farmer, Delivery Person, Customer)
+    const initialStatus = 'active';
+
     const user = await User.create({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
       role: assignedRole,
       status: initialStatus,
-      phone,
-      address,
-      avatarUrl
+      phone: phone ? phone.trim() : null,
+      cniNumber: cleanCni,
+      farmerId: generatedFarmerId,
+      professionalLicenseNumber: professionalLicenseNumber ? professionalLicenseNumber.trim() : null,
+      deliveryPersonId: generatedDeliveryPersonId,
+      driverLicenseNumber: driverLicenseNumber ? driverLicenseNumber.trim() : null,
+      vehicleType: vehicleType ? vehicleType.trim() : null,
+      vehiclePlateNumber: vehiclePlateNumber ? vehiclePlateNumber.trim() : null,
+      address: address ? address.trim() : null,
+      avatarUrl: avatarUrl && avatarUrl.trim().length > 0 ? avatarUrl.trim() : null
     });
-
-    let createdFarm = null;
-    // If Farmer, auto-create their farm record with status pending
-    if (assignedRole === 'Farmer') {
-      const { Farm } = require('../models');
-      createdFarm = await Farm.create({
-        name: farmName && farmName.trim().length > 0 ? farmName.trim() : `${name}'s Poultry Farm`,
-        location: farmLocation && farmLocation.trim().length > 0 ? farmLocation.trim() : (address || 'Local Facility'),
-        capacity: farmCapacity ? parseInt(farmCapacity) : 500,
-        currentPoultryCount: 0,
-        farmerId: user.id,
-        status: 'pending'
-      });
-    }
-
-    // Notify administrators of pending registration
-    if (initialStatus === 'pending') {
-      try {
-        const { Notification } = require('../models');
-        const admins = await User.findAll({ where: { role: 'Administrator' } });
-        for (const admin of admins) {
-          await Notification.create({
-            userId: admin.id,
-            title: `New ${assignedRole} Registration Pending`,
-            message: `${name} (${email}) has registered as a ${assignedRole} and is awaiting your approval.`,
-            type: 'system',
-            isRead: false
-          });
-        }
-      } catch (notifErr) {
-        console.error('Error creating admin notification for pending registration:', notifErr.message);
-      }
-    }
 
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
@@ -82,12 +101,8 @@ const register = async (req, res, next) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    const message = initialStatus === 'pending'
-      ? `Registration submitted successfully. Your ${assignedRole} account is pending administrator approval.`
-      : 'User registered successfully on NOVARA';
-
     return res.status(201).json({
-      message,
+      message: 'User registered successfully on NOVARA',
       token,
       user: {
         id: user.id,
@@ -95,10 +110,16 @@ const register = async (req, res, next) => {
         email: user.email,
         role: user.role,
         status: user.status,
-        avatarUrl: user.avatarUrl,
         phone: user.phone,
-        address: user.address,
-        farm: createdFarm
+        cniNumber: user.cniNumber,
+        farmerId: user.farmerId,
+        professionalLicenseNumber: user.professionalLicenseNumber,
+        deliveryPersonId: user.deliveryPersonId,
+        driverLicenseNumber: user.driverLicenseNumber,
+        vehicleType: user.vehicleType,
+        vehiclePlateNumber: user.vehiclePlateNumber,
+        avatarUrl: user.avatarUrl,
+        address: user.address
       }
     });
   } catch (error) {
@@ -153,6 +174,13 @@ const login = async (req, res, next) => {
         rejectionReason: user.rejectionReason,
         avatarUrl: user.avatarUrl,
         phone: user.phone,
+        cniNumber: user.cniNumber,
+        farmerId: user.farmerId,
+        professionalLicenseNumber: user.professionalLicenseNumber,
+        deliveryPersonId: user.deliveryPersonId,
+        driverLicenseNumber: user.driverLicenseNumber,
+        vehicleType: user.vehicleType,
+        vehiclePlateNumber: user.vehiclePlateNumber,
         address: user.address
       }
     });
@@ -186,11 +214,13 @@ const updateProfile = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    const { name, phone, address, avatarUrl } = req.body;
+    const { name, phone, address, avatarUrl, vehicleType, vehiclePlateNumber } = req.body;
     if (name) user.name = name;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
     if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+    if (vehicleType !== undefined) user.vehicleType = vehicleType;
+    if (vehiclePlateNumber !== undefined) user.vehiclePlateNumber = vehiclePlateNumber;
 
     await user.save();
 
@@ -204,6 +234,13 @@ const updateProfile = async (req, res, next) => {
         status: user.status,
         avatarUrl: user.avatarUrl,
         phone: user.phone,
+        cniNumber: user.cniNumber,
+        farmerId: user.farmerId,
+        professionalLicenseNumber: user.professionalLicenseNumber,
+        deliveryPersonId: user.deliveryPersonId,
+        driverLicenseNumber: user.driverLicenseNumber,
+        vehicleType: user.vehicleType,
+        vehiclePlateNumber: user.vehiclePlateNumber,
         address: user.address
       }
     });

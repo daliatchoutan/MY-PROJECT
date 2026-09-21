@@ -7,6 +7,11 @@ const Farm = sequelize.define('Farm', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
+  farmId: {
+    type: DataTypes.STRING(64),
+    allowNull: true,
+    unique: true
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false
@@ -25,7 +30,7 @@ const Farm = sequelize.define('Farm', {
   },
   status: {
     type: DataTypes.ENUM('pending', 'approved', 'rejected'),
-    defaultValue: 'pending'
+    defaultValue: 'approved'
   },
   rejectionReason: {
     type: DataTypes.TEXT,

@@ -93,7 +93,8 @@ const getFarmers = async (req, res, next) => {
 
 const createUser = async (req, res, next) => {
   try {
-    const { name, email, password, role, phone, address, avatarUrl } = req.body;
+    const { generateFarmerId, generateDeliveryPersonId } = require('../utils/idGenerator');
+    const { name, email, password, role, phone, address, avatarUrl, cniNumber, vehicleType, vehiclePlateNumber } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
@@ -107,12 +108,25 @@ const createUser = async (req, res, next) => {
     const validRoles = ['Administrator', 'Farmer', 'Customer', 'Delivery Person'];
     const assignedRole = validRoles.includes(role) ? role : 'Customer';
 
+    let farmerId = null;
+    let deliveryPersonId = null;
+    if (assignedRole === 'Farmer') {
+      farmerId = await generateFarmerId(User);
+    } else if (assignedRole === 'Delivery Person') {
+      deliveryPersonId = await generateDeliveryPersonId(User);
+    }
+
     const user = await User.create({
       name,
       email,
       password,
       role: assignedRole,
       phone,
+      cniNumber: cniNumber || null,
+      farmerId,
+      deliveryPersonId,
+      vehicleType: vehicleType || null,
+      vehiclePlateNumber: vehiclePlateNumber || null,
       address,
       avatarUrl,
       status: 'active'
@@ -127,6 +141,9 @@ const createUser = async (req, res, next) => {
         role: user.role,
         status: user.status,
         phone: user.phone,
+        cniNumber: user.cniNumber,
+        farmerId: user.farmerId,
+        deliveryPersonId: user.deliveryPersonId,
         address: user.address
       }
     });

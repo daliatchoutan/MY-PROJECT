@@ -163,6 +163,8 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
 
     final assignedCount = _deliveries.where((d) => d['status'] == 'assigned').length;
 
+    final driverId = auth.user?['deliveryPersonId'];
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -172,6 +174,21 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
             ),
             const SizedBox(width: 8),
             Text(locale.tr('role_delivery')),
+            if (driverId != null && driverId.toString().isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white54),
+                ),
+                child: Text(
+                  driverId.toString(),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
+              ),
+            ],
           ],
         ),
         backgroundColor: const Color(0xFF6B21A8),
