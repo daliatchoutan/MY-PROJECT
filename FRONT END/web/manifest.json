@@ -1,11 +1,11 @@
 {
-    "name": "smart_poultry_farm",
-    "short_name": "smart_poultry_farm",
+    "name": "NOVARA - Smart Poultry Farm Automation & Marketplace",
+    "short_name": "NOVARA",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D7A57",
+    "theme_color": "#0D7A57",
+    "description": "NOVARA Smart Poultry Farm Automation & Marketplace",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
