@@ -1044,6 +1044,23 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     );
   }
 
+  Color _getOrderStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'accepted':
+        return Colors.blue.shade700;
+      case 'in_transit':
+        return Colors.orange.shade800;
+      case 'delivered':
+        return const Color(0xFF0D7A57);
+      case 'rejected':
+      case 'cancelled':
+        return Colors.red.shade700;
+      case 'pending':
+      default:
+        return Colors.amber.shade800;
+    }
+  }
+
   void _showOrderDetailsDialog(dynamic o) {
     final locale = Provider.of<LocaleProvider>(context, listen: false);
     final items = (o['items'] as List<dynamic>?) ?? [];
@@ -1110,6 +1127,78 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 Text('Payment: ${o['paymentStatus']?.toString().toUpperCase()} | Status: ${o['status']?.toString().toUpperCase()}'),
                 if (driverName != null)
                   Text('Courier: $driverName (${delivery?['status'] ?? 'unassigned'})', style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_note, size: 20, color: Color(0xFF0D7A57)),
+                      const SizedBox(width: 8),
+                      Text(
+                        locale.isFrench ? 'Modifier le statut :' : 'Change Status:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const Spacer(),
+                      DropdownButton<String>(
+                        value: [
+                          'pending',
+                          'accepted',
+                          'rejected',
+                          'in_transit',
+                          'delivered',
+                          'cancelled'
+                        ].contains(o['status']?.toString().toLowerCase())
+                            ? o['status'].toString().toLowerCase()
+                            : 'pending',
+                        underline: const SizedBox(),
+                        items: [
+                          'pending',
+                          'accepted',
+                          'rejected',
+                          'in_transit',
+                          'delivered',
+                          'cancelled'
+                        ].map((s) => DropdownMenuItem(
+                              value: s,
+                              child: Text(
+                                s.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getOrderStatusColor(s),
+                                ),
+                              ),
+                            )).toList(),
+                        onChanged: (newStatus) async {
+                          if (newStatus == null) return;
+                          final auth = Provider.of<AuthProvider>(context, listen: false);
+                          final scaffold = ScaffoldMessenger.of(context);
+                          try {
+                            await auth.api.updateOrderStatus(o['id'].toString(), newStatus);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (!mounted) return;
+                            _loadFarmerData();
+                            scaffold.showSnackBar(
+                              SnackBar(
+                                content: Text('Order #${o['id'].toString().substring(0, 8)} status updated to ${newStatus.toUpperCase()}'),
+                                backgroundColor: const Color(0xFF0D7A57),
+                              ),
+                            );
+                          } catch (e) {
+                            scaffold.showSnackBar(
+                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -1241,17 +1330,24 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 4,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
-              child: Image.asset('assets/images/novara_logo.jpg', width: 30, height: 30, fit: BoxFit.cover),
+              child: Image.asset('assets/images/novara_logo.jpg', width: 28, height: 28, fit: BoxFit.cover),
             ),
-            const SizedBox(width: 8),
-            Text(locale.tr('role_farmer')),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                locale.tr('role_farmer'),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (farmerId != null && farmerId.toString().isNotEmpty) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
@@ -1259,7 +1355,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 ),
                 child: Text(
                   farmerId.toString(),
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                 ),
               ),
             ],
@@ -1980,18 +2076,92 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                               Text('Order #${o['id'].toString().substring(0, 8)}',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                               PopupMenuButton<String>(
+                                tooltip: locale.isFrench ? 'Modifier le statut de la commande' : 'Change Order Status',
                                 onSelected: (status) async {
                                   final auth = Provider.of<AuthProvider>(context, listen: false);
-                                  await auth.api.updateOrderStatus(o['id'], status);
-                                  _loadFarmerData();
+                                  final scaffold = ScaffoldMessenger.of(context);
+                                  try {
+                                    await auth.api.updateOrderStatus(o['id'].toString(), status);
+                                    if (!mounted) return;
+                                    _loadFarmerData();
+                                    scaffold.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          locale.isFrench
+                                              ? 'Statut de la commande #${o['id'].toString().substring(0, 8)} mis à jour : ${status.toUpperCase()}'
+                                              : 'Order #${o['id'].toString().substring(0, 8)} status updated to ${status.toUpperCase()}',
+                                        ),
+                                        backgroundColor: const Color(0xFF0D7A57),
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    scaffold.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Error updating status: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
                                 },
-                                itemBuilder: (ctx) => ['accepted', 'rejected', 'in_transit', 'delivered']
-                                    .map((s) => PopupMenuItem(value: s, child: Text(s)))
-                                    .toList(),
-                                child: IgnorePointer(
-                                  child: Chip(
-                                    label: Text('${o['status']}'.toUpperCase(), style: const TextStyle(fontSize: 11)),
-                                    backgroundColor: Colors.green.shade50,
+                                itemBuilder: (ctx) => [
+                                  'pending',
+                                  'accepted',
+                                  'rejected',
+                                  'in_transit',
+                                  'delivered',
+                                  'cancelled'
+                                ].map((s) {
+                                  final isCurrent = s.toLowerCase() == o['status']?.toString().toLowerCase();
+                                  return PopupMenuItem<String>(
+                                    value: s,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isCurrent ? Icons.check_circle : Icons.radio_button_unchecked,
+                                          size: 16,
+                                          color: isCurrent ? const Color(0xFF0D7A57) : Colors.grey,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          s.toUpperCase(),
+                                          style: TextStyle(
+                                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                            color: isCurrent ? const Color(0xFF0D7A57) : Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _getOrderStatusColor(o['status']?.toString()).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: _getOrderStatusColor(o['status']?.toString()),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '${o['status'] ?? 'pending'}'.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: _getOrderStatusColor(o['status']?.toString()),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.edit_note,
+                                        size: 15,
+                                        color: _getOrderStatusColor(o['status']?.toString()),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -2094,7 +2264,13 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             children: [
               const Icon(Icons.delivery_dining, color: Colors.purple),
               const SizedBox(width: 8),
-              Text(locale.isFrench ? 'Assigner la livraison' : 'Assign Delivery Courier'),
+              Expanded(
+                child: Text(
+                  locale.isFrench ? 'Assigner la livraison' : 'Assign Delivery Courier',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           content: Column(

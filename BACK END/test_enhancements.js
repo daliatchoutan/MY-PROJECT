@@ -320,6 +320,67 @@ async function runTests() {
     assert(versionData.buildNumber === 2, `Server buildNumber is 2 (got ${versionData.buildNumber})`);
     assert(versionData.apkDownloadUrl !== undefined && versionData.apkDownloadUrl.includes('/download/novara-latest.apk'), 'APK download URL points to /download/novara-latest.apk');
 
+    // [Test 8: Farmer Delivery Assignment & Order Status Modification]
+    console.log('\n[Test 8: Farmer Delivery Assignment & Order Status Modification]');
+    // 8a. Farmer fetches available delivery drivers
+    const driversReq = await fetch(`${baseUrl}/api/deliveries/drivers`, {
+      headers: { 'Authorization': `Bearer ${farmerToken}` }
+    });
+    assert(driversReq.status === 200, `Farmer fetched available drivers with 200 (got ${driversReq.status})`);
+    const driversData = await driversReq.json();
+    assert(Array.isArray(driversData.drivers), 'Available drivers list returned as array');
+
+    // 8b. Farmer assigns delivery to a driver
+    const assignReq = await fetch(`${baseUrl}/api/deliveries/${delivery.id}/assign`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${farmerToken}`
+      },
+      body: JSON.stringify({ deliveryPersonId: driverRes.user.id })
+    });
+    assert(assignReq.status === 200, `Farmer assigned delivery with HTTP 200 (got ${assignReq.status})`);
+    const assignData = await assignReq.json();
+    assert(assignData.delivery.status === 'assigned', 'Delivery status is now assigned');
+    assert(assignData.delivery.deliveryPersonId === driverRes.user.id, 'Delivery assigned to correct driver');
+
+    // 8c. Farmer modifies customer order state to 'accepted'
+    const statusAcceptedReq = await fetch(`${baseUrl}/api/orders/${order.id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${farmerToken}`
+      },
+      body: JSON.stringify({ status: 'accepted' })
+    });
+    assert(statusAcceptedReq.status === 200, `Farmer updated order to accepted with 200 (got ${statusAcceptedReq.status})`);
+    const statusAcceptedData = await statusAcceptedReq.json();
+    assert(statusAcceptedData.order.status === 'accepted', 'Order status is now accepted');
+
+    // 8d. Farmer modifies customer order state to 'in_transit'
+    const statusTransitReq = await fetch(`${baseUrl}/api/orders/${order.id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${farmerToken}`
+      },
+      body: JSON.stringify({ status: 'in_transit' })
+    });
+    assert(statusTransitReq.status === 200, `Farmer updated order to in_transit with 200 (got ${statusTransitReq.status})`);
+
+    // 8e. Farmer modifies customer order state to 'delivered'
+    const statusDeliveredReq = await fetch(`${baseUrl}/api/orders/${order.id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${farmerToken}`
+      },
+      body: JSON.stringify({ status: 'delivered' })
+    });
+    assert(statusDeliveredReq.status === 200, `Farmer updated order to delivered with 200 (got ${statusDeliveredReq.status})`);
+    const statusDeliveredData = await statusDeliveredReq.json();
+    assert(statusDeliveredData.order.status === 'delivered', 'Order status is now delivered');
+
     console.log(`\n========================================`);
     console.log(`Results: ${passed} Passed, ${failed} Failed`);
     console.log(`========================================\n`);

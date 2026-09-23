@@ -133,22 +133,35 @@ const assignDelivery = async (req, res, next) => {
     const customerPhone = order?.customer?.phone ? ` (Tel: ${order.customer.phone})` : '';
     const dropoff = delivery.dropoffAddress ? ` - Delivery to: ${delivery.dropoffAddress}` : '';
 
-    // Create immediate notification for the Delivery Person
-    await Notification.create({
-      userId: driver.id,
-      title: 'New Delivery Assigned! 🛵',
-      message: `You have been assigned to deliver order #${delivery.orderId.substring(0, 8)} for ${customerName}${customerPhone}${dropoff}. Tap to accept.`,
-      type: 'delivery_update'
-    });
+    // Create immediate notification for the Delivery Person (safely wrapped)
+    try {
+      if (driver && driver.id) {
+        await Notification.create({
+          userId: driver.id,
+          title: 'New Delivery Assigned! 🛵',
+          message: `You have been assigned to deliver order #${delivery.orderId.substring(0, 8)} for ${customerName}${customerPhone}${dropoff}. Tap to accept.`,
+          type: 'delivery_update'
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Notice creating driver notification:', notifErr.message);
+    }
 
-    // Also notify Customer that courier was assigned
+    // Also notify Customer that courier was assigned (safely checked)
     if (order && order.customerId) {
-      await Notification.create({
-        userId: order.customerId,
-        title: 'Delivery Courier Assigned 🚚',
-        message: `${driver.name} has been assigned as your delivery courier for order #${order.id.substring(0, 8)}.`,
-        type: 'delivery_update'
-      });
+      try {
+        const customerExists = await User.findByPk(order.customerId);
+        if (customerExists) {
+          await Notification.create({
+            userId: order.customerId,
+            title: 'Delivery Courier Assigned 🚚',
+            message: `${driver.name} has been assigned as your delivery courier for order #${order.id.substring(0, 8)}.`,
+            type: 'delivery_update'
+          });
+        }
+      } catch (notifErr) {
+        console.warn('Notice creating customer notification:', notifErr.message);
+      }
     }
 
     // Reload with full traceability associations

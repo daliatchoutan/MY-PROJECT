@@ -210,13 +210,37 @@ const updateOrderStatus = async (req, res, next) => {
     order.status = status;
     await order.save();
 
-    // Notify Customer
-    await Notification.create({
-      userId: order.customerId,
-      title: 'Order Status Updated',
-      message: `Your order #${order.id.substring(0, 8)} status is now '${status}'.`,
-      type: 'order_update'
-    });
+    // Synchronize delivery status if applicable
+    if (order.delivery) {
+      if (status === 'delivered') {
+        order.delivery.status = 'delivered';
+        order.delivery.deliveredAt = new Date();
+        await order.delivery.save();
+      } else if (status === 'in_transit' && order.delivery.status === 'assigned') {
+        order.delivery.status = 'in_transit';
+        await order.delivery.save();
+      } else if (status === 'cancelled') {
+        order.delivery.status = 'cancelled';
+        await order.delivery.save();
+      }
+    }
+
+    // Safely notify Customer
+    if (order.customerId) {
+      try {
+        const customerExists = await User.findByPk(order.customerId);
+        if (customerExists) {
+          await Notification.create({
+            userId: order.customerId,
+            title: 'Order Status Updated',
+            message: `Your order #${order.id.substring(0, 8)} status is now '${status}'.`,
+            type: 'order_update'
+          });
+        }
+      } catch (notifErr) {
+        console.warn('Notice creating customer notification on order status update:', notifErr.message);
+      }
+    }
 
     return res.json({ message: 'Order status updated successfully', order });
   } catch (error) {
