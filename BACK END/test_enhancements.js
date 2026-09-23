@@ -324,16 +324,25 @@ async function runTests() {
     console.log(`Results: ${passed} Passed, ${failed} Failed`);
     console.log(`========================================\n`);
 
-    server.close();
-    if (failed > 0) {
-      process.exit(1);
-    } else {
-      process.exit(0);
-    }
   } catch (err) {
     console.error('Test execution error:', err);
+    failed++;
+  } finally {
+    // Clean up all temporary test artifacts created during this run
+    try {
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
+      const [testUsers] = await sequelize.query("SELECT id FROM users WHERE email LIKE '%@testnovara.cm';");
+      const userIds = testUsers.map(u => `'${u.id}'`);
+      if (userIds.length > 0) {
+        await sequelize.query(`DELETE FROM farms WHERE farmerId IN (${userIds.join(',')});`);
+        await sequelize.query("DELETE FROM users WHERE email LIKE '%@testnovara.cm%';");
+      }
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1;');
+    } catch (cleanupErr) {
+      console.warn('Notice during test cleanup:', cleanupErr.message);
+    }
     server.close();
-    process.exit(1);
+    process.exit(failed > 0 ? 1 : 0);
   }
 }
 

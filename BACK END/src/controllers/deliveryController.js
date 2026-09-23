@@ -79,23 +79,6 @@ const getAvailableDrivers = async (req, res, next) => {
       attributes: ['id', 'name', 'email', 'phone', 'avatarUrl', 'status', 'deliveryPersonId', 'vehicleType', 'vehiclePlateNumber']
     });
 
-    // If none exist yet, automatically seed a default active Courier
-    if (drivers.length === 0) {
-      const hashedPassword = await bcrypt.hash('delivery123', 10);
-      const newDriver = await User.create({
-        name: 'Alain Dupont (Livreur)',
-        email: 'delivery@novara.cm',
-        password: hashedPassword,
-        role: 'Delivery Person',
-        status: 'active',
-        phone: '+237 670 123 456',
-        deliveryPersonId: 'NOV-DRV-00001',
-        vehicleType: 'Motorcycle',
-        vehiclePlateNumber: 'LT 1234 XY'
-      });
-      drivers = [newDriver];
-    }
-
     return res.json({ drivers });
   } catch (error) {
     next(error);
