@@ -277,8 +277,9 @@ class ApiService {
     return await _processResponse(response);
   }
 
-  Future<Map<String, dynamic>> initiatePayment(String orderId, String paymentMethod, {String? successUrl, String? failureUrl}) async {
+  Future<Map<String, dynamic>> initiatePayment(String orderId, String paymentMethod, {String? phone, String? successUrl, String? failureUrl}) async {
     final payload = <String, dynamic>{'paymentMethod': paymentMethod};
+    if (phone != null && phone.trim().isNotEmpty) payload['phone'] = phone.trim();
     if (successUrl != null) payload['successUrl'] = successUrl;
     if (failureUrl != null) payload['failureUrl'] = failureUrl;
 

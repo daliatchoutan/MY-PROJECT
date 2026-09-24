@@ -131,7 +131,7 @@ const createOrder = async (req, res, next) => {
 
 const initiatePayment = async (req, res, next) => {
   try {
-    const { paymentMethod, successUrl, failureUrl } = req.body;
+    const { paymentMethod, phone, successUrl, failureUrl } = req.body;
     const order = await Order.findByPk(req.params.id);
 
     if (!order) {
@@ -153,6 +153,7 @@ const initiatePayment = async (req, res, next) => {
       const sessionResult = await digiPayService.createPaymentSession({
         order,
         customer,
+        phone,
         paymentMethod: order.paymentMethod,
         successUrl,
         failureUrl

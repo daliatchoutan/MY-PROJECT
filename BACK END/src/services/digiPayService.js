@@ -1,6 +1,9 @@
 /**
  * DigiPay Payment Gateway Service for NOVARA
- * Handles checkout session initialization, verification, and webhook notifications.
+ * Based on official documentation: https://digitalcertify.tech/docs
+ *
+ * Base URL: https://digitalcertify.tech/v1/api
+ * Authentication: Header "x-api-key: dpk_YOUR_API_KEY"
  *
  * NOTE: Credentials are read directly from environment variables.
  * Never hard-code, log, or expose the real API key in source code or responses.
@@ -10,10 +13,7 @@ const getBaseUrl = () => {
   if (process.env.DIGIPAY_BASE_URL && process.env.DIGIPAY_BASE_URL.trim() !== '') {
     return process.env.DIGIPAY_BASE_URL.trim().replace(/\/+$/, '');
   }
-  const env = (process.env.DIGIPAY_ENV || 'staging').toLowerCase();
-  return env === 'production'
-    ? 'https://api.digetpay.com/v1'
-    : 'https://fin-api.digetpay.com/v1';
+  return 'https://digitalcertify.tech/v1/api';
 };
 
 const getApiKey = () => {
@@ -26,22 +26,38 @@ const isConfigured = () => {
 };
 
 /**
- * Creates a DigiPay checkout payment session.
+ * Normalizes phone numbers to standard Cameroon format: 237XXXXXXXXX (digits only).
+ * E.g., "+237 671 234 567" -> "237671234567"
+ * E.g., "671234567" -> "237671234567"
+ */
+const formatPhone = (phone) => {
+  if (!phone) return '';
+  const digits = phone.toString().replace(/\D/g, '');
+  if (digits.startsWith('237') && digits.length === 12) return digits;
+  if (digits.length === 9) return `237${digits}`;
+  return digits;
+};
+
+/**
+ * Initiates a Mobile Money Pay-in request via DigiPay API.
+ * The customer receives a push notification on their phone to approve the transaction.
+ *
+ * Endpoint: POST /payments/initiate
  *
  * @param {Object} params
- * @param {Object} params.order - Order Sequelize model or object with id, totalAmount, currency
+ * @param {Object} params.order - Order Sequelize model or object with id, totalAmount
  * @param {Object} [params.customer] - Customer object with name, email, phone
+ * @param {string} [params.phone] - Optional phone override for Mobile Money push
  * @param {string} [params.paymentMethod] - Selected channel (e.g., 'MTN Mobile Money', 'Orange Money')
- * @param {string} [params.successUrl] - Client redirect URL on success
- * @param {string} [params.failureUrl] - Client redirect URL on failure
- * @returns {Promise<Object>} Session details containing paymentUrl and paymentReference
+ * @param {string} [params.webhookUrl] - Optional webhook callback URL
+ * @returns {Promise<Object>} Session / transaction details
  */
-const createPaymentSession = async ({ order, customer, paymentMethod, successUrl, failureUrl }) => {
+const createPaymentSession = async ({ order, customer, phone, paymentMethod, webhookUrl }) => {
   const apiKey = getApiKey();
   const baseUrl = getBaseUrl();
 
   if (!isConfigured()) {
-    console.warn('[DigiPay] Warning: DIGIPAY_API_KEY is not configured in .env. Payment session will not reach external gateway.');
+    console.warn('[DigiPay] Warning: DIGIPAY_API_KEY is not configured in .env. Payment request will not reach external gateway.');
     return {
       success: false,
       configured: false,
@@ -51,26 +67,26 @@ const createPaymentSession = async ({ order, customer, paymentMethod, successUrl
     };
   }
 
-  // Normalize currency: FCFA -> XAF for standard banking gateways
-  let currencyCode = (order.currency || 'XAF').toUpperCase();
-  if (currencyCode === 'FCFA') currencyCode = 'XAF';
+  const customerPhone = formatPhone(phone || customer?.phone);
 
   const payload = {
-    merchantOrderId: order.id,
-    amount: parseFloat(order.totalAmount),
-    currency: currencyCode,
-    paymentMethod: paymentMethod || 'MTN Mobile Money',
-    customerName: customer?.name || 'Novara Customer',
+    amount: Math.round(parseFloat(order.totalAmount)),
+    customerPhone: customerPhone || '237699000000',
     customerEmail: customer?.email || 'customer@novara.app',
-    customerPhone: customer?.phone || '',
-    successUrl: successUrl || '',
-    failureUrl: failureUrl || ''
+    metadata: {
+      orderId: order.id,
+      paymentMethod: paymentMethod || 'MTN Mobile Money',
+      customerName: customer?.name || 'Novara Customer'
+    }
   };
 
+  if (webhookUrl) {
+    payload.webhookUrl = webhookUrl;
+  }
+
   try {
-    // Attempt standard initiate endpoint (spelled 'intiate' or 'initiate' per DigiPay docs)
-    let endpoint = `${baseUrl}/payment/checkout/intiate`;
-    let response = await fetch(endpoint, {
+    const endpoint = `${baseUrl}/payments/initiate`;
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -79,24 +95,11 @@ const createPaymentSession = async ({ order, customer, paymentMethod, successUrl
       body: JSON.stringify(payload)
     });
 
-    // If 404, fallback to initiate spelling
-    if (response.status === 404) {
-      endpoint = `${baseUrl}/payment/checkout/initiate`;
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey
-        },
-        body: JSON.stringify(payload)
-      });
-    }
-
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       const errMsg = data.message || data.error || `DigiPay API error (HTTP ${response.status})`;
-      console.error(`[DigiPay] Failed to initiate session: ${errMsg}`);
+      console.error(`[DigiPay] Failed to initiate pay-in: ${errMsg}`);
       return {
         success: false,
         configured: true,
@@ -107,20 +110,21 @@ const createPaymentSession = async ({ order, customer, paymentMethod, successUrl
       };
     }
 
-    // DigiPay responses typically provide: { id, redirectUrl } or { data: { id, redirectUrl } }
-    const sessionData = data.data || data;
-    const paymentReference = sessionData.id || sessionData.transactionId || sessionData.reference || null;
-    const paymentUrl = sessionData.redirectUrl || sessionData.paymentUrl || sessionData.checkoutUrl || null;
+    // DigiPay initiate response shape: { success: true, transactionId: "TXN_...", amount: 5000, status: "pending" }
+    const transactionId = data.transactionId || (data.data && data.data.transactionId) || data.id || null;
+    const paymentUrl = data.paymentUrl || (data.data && data.data.paymentUrl) || null;
 
     return {
       success: true,
       configured: true,
-      paymentReference,
+      paymentReference: transactionId,
       paymentUrl,
-      raw: sessionData
+      customerPhone,
+      status: data.status || 'pending',
+      raw: data
     };
   } catch (error) {
-    console.error('[DigiPay] Network or execution error initiating checkout session:', error.message);
+    console.error('[DigiPay] Network error initiating pay-in with DigiPay:', error.message);
     return {
       success: false,
       configured: true,
@@ -132,13 +136,15 @@ const createPaymentSession = async ({ order, customer, paymentMethod, successUrl
 };
 
 /**
- * Verifies payment status with DigiPay API.
+ * Checks transaction status with DigiPay API.
  * An order should only be marked 'paid' when confirmed by the gateway status.
  *
- * @param {string} paymentReference - The DigiPay session/transaction ID
+ * Endpoint: GET /payments/transactions/{transactionId}
+ *
+ * @param {string} transactionId - The DigiPay transaction ID
  * @returns {Promise<Object>} Verification result with normalized status
  */
-const verifyPaymentStatus = async (paymentReference) => {
+const verifyPaymentStatus = async (transactionId) => {
   const apiKey = getApiKey();
   const baseUrl = getBaseUrl();
 
@@ -151,16 +157,16 @@ const verifyPaymentStatus = async (paymentReference) => {
     };
   }
 
-  if (!paymentReference) {
+  if (!transactionId) {
     return {
       isPaid: false,
       status: 'failed',
-      message: 'No payment reference provided for verification.'
+      message: 'No transaction ID provided for verification.'
     };
   }
 
   try {
-    const endpoint = `${baseUrl}/payment/checkout/status?id=${encodeURIComponent(paymentReference)}`;
+    const endpoint = `${baseUrl}/payments/transactions/${encodeURIComponent(transactionId)}`;
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
@@ -171,7 +177,7 @@ const verifyPaymentStatus = async (paymentReference) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      console.error(`[DigiPay] Verification check failed with HTTP ${response.status}`);
+      console.error(`[DigiPay] Transaction check failed with HTTP ${response.status}`);
       return {
         isPaid: false,
         status: 'pending',
@@ -181,34 +187,30 @@ const verifyPaymentStatus = async (paymentReference) => {
     }
 
     const payload = data.data || data;
-    const txStatus = (payload.transactionStatus || payload.status || '').toUpperCase();
-    const payStatus = (payload.paymentStatus || '').toUpperCase();
+    const statusStr = (payload.status || '').toLowerCase();
 
-    // Positive verification according to DigiPay spec:
-    // transactionStatus === 'SUCCESS' && paymentStatus === 'APPROVED'
-    const isPaid = (txStatus === 'SUCCESS' && (payStatus === 'APPROVED' || !payload.paymentStatus)) ||
-                   payStatus === 'APPROVED' ||
-                   txStatus === 'COMPLETED' ||
-                   txStatus === 'PAID';
+    // In DigiPay: "success", "pending", "failed", "refunded"
+    const isPaid = statusStr === 'success' || statusStr === 'completed' || statusStr === 'approved';
 
     let normalizedStatus = 'pending';
     if (isPaid) {
       normalizedStatus = 'paid';
-    } else if (txStatus === 'FAILED' || txStatus === 'REJECTED' || payStatus === 'DECLINED' || payStatus === 'FAILED') {
+    } else if (statusStr === 'failed' || statusStr === 'declined' || statusStr === 'rejected') {
       normalizedStatus = 'failed';
-    } else if (txStatus === 'CANCELLED' || txStatus === 'CANCELED') {
+    } else if (statusStr === 'refunded' || statusStr === 'cancelled') {
       normalizedStatus = 'cancelled';
     }
 
     return {
       isPaid,
       status: normalizedStatus,
-      transactionStatus: txStatus,
-      paymentStatus: payStatus,
+      rawStatus: statusStr,
+      transactionId: payload.transactionId || transactionId,
+      amount: payload.amount,
       raw: payload
     };
   } catch (error) {
-    console.error('[DigiPay] Error querying payment status:', error.message);
+    console.error('[DigiPay] Error querying transaction status:', error.message);
     return {
       isPaid: false,
       status: 'pending',
@@ -220,6 +222,10 @@ const verifyPaymentStatus = async (paymentReference) => {
 /**
  * Validates and processes an incoming DigiPay webhook notification.
  *
+ * Official DigiPay Webhook format:
+ * - Success: { "event": "payment.success", "data": { "transactionId": "TXN_...", "status": "success", "metadata": { "orderId": "..." } } }
+ * - Failed: { "event": "payment.failed", "data": { "transactionId": "TXN_...", "status": "failed", "reason": "..." } }
+ *
  * @param {Object} body - Webhook request payload
  * @returns {Object} Normalized webhook data
  */
@@ -228,39 +234,40 @@ const parseWebhookPayload = (body) => {
     return { valid: false, message: 'Invalid webhook payload' };
   }
 
-  const orderId = body.merchantOrderId || body.orderId || body.reference;
-  const transactionId = body.transactionId || body.id;
-  const statusStr = (body.status || body.transactionStatus || '').toUpperCase();
-  const paymentStatus = (body.paymentStatus || '').toUpperCase();
+  const event = body.event || '';
+  const data = body.data || body;
+  const metadata = data.metadata || {};
 
-  const isPaid = (statusStr === 'SUCCESS' && (paymentStatus === 'APPROVED' || !paymentStatus)) ||
-                 paymentStatus === 'APPROVED' ||
-                 statusStr === 'COMPLETED' ||
-                 statusStr === 'PAID';
+  const orderId = metadata.orderId || data.merchantOrderId || data.orderId || body.orderId;
+  const transactionId = data.transactionId || data.id || body.transactionId;
+  const statusStr = (data.status || '').toLowerCase();
+
+  const isPaid = event === 'payment.success' || statusStr === 'success' || statusStr === 'completed' || statusStr === 'approved';
 
   let normalizedStatus = 'pending';
   if (isPaid) {
     normalizedStatus = 'paid';
-  } else if (statusStr === 'FAILED' || statusStr === 'REJECTED' || paymentStatus === 'DECLINED' || paymentStatus === 'FAILED') {
+  } else if (event === 'payment.failed' || statusStr === 'failed' || statusStr === 'declined') {
     normalizedStatus = 'failed';
-  } else if (statusStr === 'CANCELLED' || statusStr === 'CANCELED') {
+  } else if (statusStr === 'refunded' || statusStr === 'cancelled') {
     normalizedStatus = 'cancelled';
   }
 
   return {
-    valid: Boolean(orderId),
+    valid: Boolean(orderId || transactionId),
     orderId,
     transactionId,
-    amount: body.amount,
-    currencyCode: body.currencyCode || body.currency,
+    amount: data.amount,
     isPaid,
     status: normalizedStatus,
+    event,
     raw: body
   };
 };
 
 module.exports = {
   isConfigured,
+  formatPhone,
   createPaymentSession,
   verifyPaymentStatus,
   parseWebhookPayload,

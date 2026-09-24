@@ -18,30 +18,55 @@ describe('DigiPay Payment Integration Tests', () => {
       process.env.DIGIPAY_API_KEY = origKey;
     });
 
-    it('should parse webhook payload correctly for successful approval', () => {
+    it('should normalize Cameroon phone numbers correctly', () => {
+      assert.strictEqual(digiPayService.formatPhone('+237 671 234 567'), '237671234567');
+      assert.strictEqual(digiPayService.formatPhone('699000000'), '237699000000');
+      assert.strictEqual(digiPayService.formatPhone('237699000000'), '237699000000');
+    });
+
+    it('should use digitalcertify.tech base URL by default', () => {
+      const orig = process.env.DIGIPAY_BASE_URL;
+      delete process.env.DIGIPAY_BASE_URL;
+      assert.strictEqual(digiPayService.getBaseUrl(), 'https://digitalcertify.tech/v1/api');
+      process.env.DIGIPAY_BASE_URL = orig;
+    });
+
+    it('should parse official DigiPay webhook payment.success event', () => {
       const payload = {
-        merchantOrderId: 'ord-12345678',
-        transactionId: 'txn-digipay-999',
-        amount: 5000,
-        currencyCode: 'XAF',
-        status: 'SUCCESS',
-        paymentStatus: 'APPROVED'
+        event: 'payment.success',
+        data: {
+          transactionId: 'TXN_A1B2C3D4E5F6G7H8',
+          amount: 5250,
+          baseAmount: 5000,
+          commissionAmount: 250,
+          status: 'success',
+          customerPhone: '237699000000',
+          metadata: {
+            orderId: 'ord-12345678'
+          }
+        }
       };
 
       const result = digiPayService.parseWebhookPayload(payload);
       assert.strictEqual(result.valid, true);
       assert.strictEqual(result.orderId, 'ord-12345678');
+      assert.strictEqual(result.transactionId, 'TXN_A1B2C3D4E5F6G7H8');
       assert.strictEqual(result.isPaid, true);
       assert.strictEqual(result.status, 'paid');
     });
 
-    it('should parse webhook payload correctly for failed payment', () => {
+    it('should parse official DigiPay webhook payment.failed event', () => {
       const payload = {
-        merchantOrderId: 'ord-12345678',
-        transactionId: 'txn-digipay-999',
-        amount: 5000,
-        status: 'FAILED',
-        paymentStatus: 'DECLINED'
+        event: 'payment.failed',
+        data: {
+          transactionId: 'TXN_A1B2C3D4E5F6G7H8',
+          amount: 5250,
+          status: 'failed',
+          reason: 'Customer declined the payment request',
+          metadata: {
+            orderId: 'ord-12345678'
+          }
+        }
       };
 
       const result = digiPayService.parseWebhookPayload(payload);
@@ -107,14 +132,14 @@ describe('DigiPay Payment Integration Tests', () => {
       sinon.stub(digiPayService, 'isConfigured').returns(true);
       sinon.stub(digiPayService, 'createPaymentSession').resolves({
         success: true,
-        paymentReference: 'DGP-SESSION-888',
-        paymentUrl: 'https://checkout.digipay.com/pay/888'
+        paymentReference: 'TXN_DIGIPAY_888',
+        customerPhone: '237670000000'
       });
 
       const req = createMockReq({
         params: { id: 'ord-1' },
         user: { id: 'cust-1', role: 'Customer' },
-        body: { paymentMethod: 'MTN Mobile Money' }
+        body: { paymentMethod: 'MTN Mobile Money', phone: '237670000000' }
       });
       const res = createMockRes();
       const next = createMockNext();
@@ -123,21 +148,20 @@ describe('DigiPay Payment Integration Tests', () => {
 
       assert.strictEqual(res.statusCode, 200);
       assert.strictEqual(res.data.provider, 'DigiPay');
-      assert.strictEqual(res.data.paymentReference, 'DGP-SESSION-888');
-      assert.strictEqual(res.data.paymentUrl, 'https://checkout.digipay.com/pay/888');
+      assert.strictEqual(res.data.paymentReference, 'TXN_DIGIPAY_888');
       assert.strictEqual(fakeOrder.paymentStatus, 'pending');
       assert(fakeOrder.save.calledOnce);
     });
   });
 
   describe('orderController.verifyPayment', () => {
-    it('should mark order paid when DigiPay confirms APPROVED / SUCCESS', async () => {
+    it('should mark order paid when DigiPay confirms status: success', async () => {
       const fakeOrder = {
         id: 'ord-verify-1',
         customerId: 'cust-1',
         totalAmount: 7500,
         paymentStatus: 'pending',
-        paymentReference: 'DGP-SESSION-888',
+        paymentReference: 'TXN_DIGIPAY_888',
         save: sinon.stub().resolves()
       };
       sinon.stub(Order, 'findByPk').resolves(fakeOrder);
@@ -145,8 +169,8 @@ describe('DigiPay Payment Integration Tests', () => {
       sinon.stub(digiPayService, 'verifyPaymentStatus').resolves({
         isPaid: true,
         status: 'paid',
-        transactionStatus: 'SUCCESS',
-        paymentStatus: 'APPROVED'
+        rawStatus: 'success',
+        transactionId: 'TXN_DIGIPAY_888'
       });
       sinon.stub(Notification, 'create').resolves({});
 
@@ -167,13 +191,13 @@ describe('DigiPay Payment Integration Tests', () => {
       assert(Notification.create.calledOnce);
     });
 
-    it('should keep order pending when DigiPay confirms payment is not yet completed', async () => {
+    it('should keep order pending when DigiPay confirms status: pending', async () => {
       const fakeOrder = {
         id: 'ord-verify-2',
         customerId: 'cust-1',
         totalAmount: 7500,
         paymentStatus: 'pending',
-        paymentReference: 'DGP-SESSION-888',
+        paymentReference: 'TXN_DIGIPAY_888',
         save: sinon.stub().resolves()
       };
       sinon.stub(Order, 'findByPk').resolves(fakeOrder);
@@ -181,7 +205,7 @@ describe('DigiPay Payment Integration Tests', () => {
       sinon.stub(digiPayService, 'verifyPaymentStatus').resolves({
         isPaid: false,
         status: 'pending',
-        transactionStatus: 'PENDING'
+        rawStatus: 'pending'
       });
 
       const req = createMockReq({
@@ -201,7 +225,7 @@ describe('DigiPay Payment Integration Tests', () => {
   });
 
   describe('orderController.handleDigiPayWebhook', () => {
-    it('should process webhook and update order to paid', async () => {
+    it('should process payment.success webhook and update order to paid', async () => {
       const fakeOrder = {
         id: 'ord-hook-1',
         customerId: 'cust-1',
@@ -215,11 +239,15 @@ describe('DigiPay Payment Integration Tests', () => {
 
       const req = createMockReq({
         body: {
-          merchantOrderId: 'ord-hook-1',
-          transactionId: 'txn-digipay-hook-77',
-          status: 'SUCCESS',
-          paymentStatus: 'APPROVED',
-          amount: 10000
+          event: 'payment.success',
+          data: {
+            transactionId: 'TXN_DIGIPAY_HOOK_77',
+            amount: 10000,
+            status: 'success',
+            metadata: {
+              orderId: 'ord-hook-1'
+            }
+          }
         }
       });
       const res = createMockRes();
@@ -231,7 +259,7 @@ describe('DigiPay Payment Integration Tests', () => {
       assert.strictEqual(res.data.received, true);
       assert.strictEqual(res.data.status, 'paid');
       assert.strictEqual(fakeOrder.paymentStatus, 'paid');
-      assert.strictEqual(fakeOrder.paymentReference, 'txn-digipay-hook-77');
+      assert.strictEqual(fakeOrder.paymentReference, 'TXN_DIGIPAY_HOOK_77');
       assert(fakeOrder.save.calledOnce);
       assert(Notification.create.calledOnce);
     });
