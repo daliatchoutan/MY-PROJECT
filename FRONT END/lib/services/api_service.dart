@@ -277,11 +277,23 @@ class ApiService {
     return await _processResponse(response);
   }
 
-  Future<Map<String, dynamic>> initiatePayment(String orderId, String paymentMethod) async {
+  Future<Map<String, dynamic>> initiatePayment(String orderId, String paymentMethod, {String? successUrl, String? failureUrl}) async {
+    final payload = <String, dynamic>{'paymentMethod': paymentMethod};
+    if (successUrl != null) payload['successUrl'] = successUrl;
+    if (failureUrl != null) payload['failureUrl'] = failureUrl;
+
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/orders/$orderId/pay'),
       headers: ApiConfig.headers(token),
-      body: jsonEncode({'paymentMethod': paymentMethod}),
+      body: jsonEncode(payload),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> verifyPayment(String orderId) async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/orders/$orderId/verify-payment'),
+      headers: ApiConfig.headers(token),
     );
     return await _processResponse(response);
   }

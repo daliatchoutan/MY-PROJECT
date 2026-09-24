@@ -1,4 +1,5 @@
 const { Order, OrderItem, Product, Farm, User, Delivery, Notification, sequelize } = require('../models');
+const digiPayService = require('../services/digiPayService');
 
 const createOrder = async (req, res, next) => {
   const transaction = await sequelize.transaction();
@@ -130,7 +131,7 @@ const createOrder = async (req, res, next) => {
 
 const initiatePayment = async (req, res, next) => {
   try {
-    const { paymentMethod } = req.body; // e.g. 'MTN Mobile Money', 'Orange Money', 'Credit Card'
+    const { paymentMethod, successUrl, failureUrl } = req.body;
     const order = await Order.findByPk(req.params.id);
 
     if (!order) {
@@ -142,19 +143,186 @@ const initiatePayment = async (req, res, next) => {
     }
 
     order.paymentMethod = paymentMethod || 'MTN Mobile Money';
-    order.paymentStatus = 'paid';
-    await order.save();
+    order.paymentProvider = 'DigiPay';
 
-    await Notification.create({
-      userId: order.customerId,
-      title: 'Payment Confirmed',
-      message: `Payment of ${order.totalAmount} FCFA for order #${order.id.substring(0, 8)} was successful via ${order.paymentMethod}.`,
-      type: 'order_update'
+    const customer = await User.findByPk(order.customerId, {
+      attributes: ['id', 'name', 'email', 'phone']
     });
 
-    return res.json({ message: 'Payment completed successfully in FCFA', order });
+    if (digiPayService.isConfigured()) {
+      const sessionResult = await digiPayService.createPaymentSession({
+        order,
+        customer,
+        paymentMethod: order.paymentMethod,
+        successUrl,
+        failureUrl
+      });
+
+      if (sessionResult.success) {
+        order.paymentReference = sessionResult.paymentReference;
+        order.paymentUrl = sessionResult.paymentUrl;
+        order.paymentStatus = 'pending';
+        await order.save();
+
+        return res.json({
+          message: 'DigiPay payment session initiated successfully',
+          order,
+          paymentUrl: sessionResult.paymentUrl,
+          paymentReference: sessionResult.paymentReference,
+          provider: 'DigiPay'
+        });
+      } else {
+        await order.save();
+        return res.status(502).json({
+          message: sessionResult.message || 'Failed to initiate DigiPay payment session',
+          order,
+          provider: 'DigiPay'
+        });
+      }
+    } else {
+      const localRef = `DIGIPAY-PENDING-${order.id.substring(0, 8)}`;
+      order.paymentReference = localRef;
+      await order.save();
+
+      return res.json({
+        message: 'DigiPay integration initialized. Awaiting DIGIPAY_API_KEY in .env for live gateway checkout.',
+        order,
+        paymentReference: localRef,
+        provider: 'DigiPay',
+        isAwaitingKey: true
+      });
+    }
   } catch (error) {
     next(error);
+  }
+};
+
+const verifyPayment = async (req, res, next) => {
+  try {
+    const order = await Order.findByPk(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    if (req.user.role === 'Customer' && order.customerId !== req.user.id) {
+      return res.status(403).json({ message: 'Forbidden. You do not own this order.' });
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return res.json({
+        message: 'Order payment already confirmed',
+        order,
+        paymentStatus: 'paid',
+        isPaid: true
+      });
+    }
+
+    if (digiPayService.isConfigured() && order.paymentReference) {
+      const verification = await digiPayService.verifyPaymentStatus(order.paymentReference);
+
+      if (verification.isPaid) {
+        order.paymentStatus = 'paid';
+        await order.save();
+
+        try {
+          await Notification.create({
+            userId: order.customerId,
+            title: 'Payment Confirmed by DigiPay',
+            message: `Payment of ${order.totalAmount} FCFA for order #${order.id.substring(0, 8)} was verified and confirmed via DigiPay.`,
+            type: 'order_update'
+          });
+        } catch (notifErr) {
+          console.warn('Notice creating customer notification on payment verification:', notifErr.message);
+        }
+
+        return res.json({
+          message: 'Payment verified and confirmed successfully via DigiPay',
+          order,
+          paymentStatus: 'paid',
+          isPaid: true,
+          verification
+        });
+      } else if (verification.status === 'failed') {
+        order.paymentStatus = 'failed';
+        await order.save();
+
+        return res.json({
+          message: 'Payment verification failed at DigiPay gateway',
+          order,
+          paymentStatus: 'failed',
+          isPaid: false,
+          verification
+        });
+      } else {
+        return res.json({
+          message: 'Payment is still pending with DigiPay',
+          order,
+          paymentStatus: order.paymentStatus,
+          isPaid: false,
+          verification
+        });
+      }
+    } else {
+      return res.json({
+        message: order.paymentReference
+          ? 'DigiPay verification pending: DIGIPAY_API_KEY awaiting configuration in .env'
+          : 'No payment reference found for this order.',
+        order,
+        paymentStatus: order.paymentStatus,
+        isPaid: order.paymentStatus === 'paid',
+        isConfigured: digiPayService.isConfigured()
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+const handleDigiPayWebhook = async (req, res, next) => {
+  try {
+    const parsed = digiPayService.parseWebhookPayload(req.body);
+
+    if (!parsed.valid || !parsed.orderId) {
+      return res.status(400).json({ message: 'Invalid DigiPay webhook payload' });
+    }
+
+    let order = await Order.findByPk(parsed.orderId);
+    if (!order && parsed.transactionId) {
+      order = await Order.findOne({ where: { paymentReference: parsed.transactionId } });
+    }
+
+    if (!order) {
+      console.warn(`[DigiPay Webhook] Order not found for reference: ${parsed.orderId}`);
+      return res.status(200).json({ received: true, warning: 'Order not found in NOVARA' });
+    }
+
+    if (parsed.isPaid && order.paymentStatus !== 'paid') {
+      order.paymentStatus = 'paid';
+      if (parsed.transactionId && !order.paymentReference) {
+        order.paymentReference = parsed.transactionId;
+      }
+      await order.save();
+
+      try {
+        await Notification.create({
+          userId: order.customerId,
+          title: 'DigiPay Payment Received',
+          message: `Payment of ${order.totalAmount} FCFA for order #${order.id.substring(0, 8)} confirmed via DigiPay webhook.`,
+          type: 'order_update'
+        });
+      } catch (notifErr) {
+        console.warn('Notice creating customer notification on webhook:', notifErr.message);
+      }
+    } else if (parsed.status === 'failed' && order.paymentStatus === 'pending') {
+      order.paymentStatus = 'failed';
+      await order.save();
+    }
+
+    return res.status(200).json({ received: true, status: order.paymentStatus });
+  } catch (error) {
+    console.error('[DigiPay Webhook] Error processing webhook:', error.message);
+    return res.status(200).json({ received: false, error: error.message });
   }
 };
 
@@ -344,6 +512,8 @@ const cancelOrder = async (req, res, next) => {
 module.exports = {
   createOrder,
   initiatePayment,
+  verifyPayment,
+  handleDigiPayWebhook,
   getOrders,
   updateOrderStatus,
   updateOrder,

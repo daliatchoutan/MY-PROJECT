@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
@@ -388,15 +389,43 @@ class _CustomerDashboardState extends State<CustomerDashboard>
         builder: (ctx, setDialogState) => AlertDialog(
           title: Row(
             children: [
-              const Icon(Icons.payment, color: Color(0xFF0D7A57)),
+              const Icon(Icons.lock_outline, color: Color(0xFF0D7A57)),
               const SizedBox(width: 8),
-              Text(locale.isFrench ? 'Effectuer le paiement' : 'Initiate Payment'),
+              Expanded(
+                child: Text(
+                  locale.isFrench ? 'Paiement DigiPay' : 'DigiPay Checkout',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D7A57).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_user, color: Color(0xFF0D7A57), size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      'DigiPay Gateway',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green.shade900,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               Text(
                 '${locale.tr('total')}: $amount FCFA',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0D7A57)),
@@ -405,7 +434,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               DropdownButtonFormField<String>(
                 initialValue: selectedMethod,
                 decoration: InputDecoration(
-                  labelText: locale.isFrench ? 'Moyen de paiement' : 'Payment Channel',
+                  labelText: locale.isFrench ? 'Canal de paiement' : 'Payment Channel',
                   border: const OutlineInputBorder(),
                 ),
                 items: ['MTN Mobile Money', 'Orange Money', 'Credit / Debit Card']
@@ -426,21 +455,47 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                 final auth = Provider.of<AuthProvider>(context, listen: false);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
                 try {
-                  await auth.api.initiatePayment(orderId, selectedMethod);
+                  final res = await auth.api.initiatePayment(orderId, selectedMethod);
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (!mounted) return;
                   _loadData();
-                  scaffoldMessenger.hideCurrentSnackBar();
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        locale.isFrench
-                            ? 'Paiement de $amount FCFA confirmé via $selectedMethod !'
-                            : 'Payment of $amount FCFA confirmed via $selectedMethod!',
+
+                  final paymentUrl = res['paymentUrl']?.toString();
+                  final isAwaitingKey = res['isAwaitingKey'] == true;
+                  final ref = res['paymentReference']?.toString() ?? '';
+
+                  if (paymentUrl != null && paymentUrl.isNotEmpty) {
+                    final uri = Uri.parse(paymentUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                    if (mounted) {
+                      _showDigiPayVerifyDialog(orderId, amount);
+                    }
+                  } else if (isAwaitingKey) {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          locale.isFrench
+                              ? 'Session DigiPay enregistrée ($ref). En attente de DIGIPAY_API_KEY dans le .env backend.'
+                              : 'DigiPay session registered ($ref). Awaiting DIGIPAY_API_KEY in backend .env.',
+                        ),
+                        backgroundColor: const Color(0xFFE67E22),
                       ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                    );
+                  } else {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          res['message'] ??
+                              (locale.isFrench
+                                  ? 'Session DigiPay créée avec succès !'
+                                  : 'DigiPay session created successfully!'),
+                        ),
+                        backgroundColor: const Color(0xFF0D7A57),
+                      ),
+                    );
+                  }
                 } catch (e) {
                   setDialogState(() => isProcessing = false);
                   if (ctx.mounted) {
@@ -460,12 +515,145 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : Text(locale.isFrench ? 'Confirmer' : 'Confirm Payment'),
+                  : Text(locale.isFrench ? 'Payer avec DigiPay' : 'Pay with DigiPay'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _showDigiPayVerifyDialog(String orderId, dynamic amount) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    bool isVerifying = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.sync_outlined, color: Color(0xFF0D7A57)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  locale.isFrench ? 'Validation du paiement DigiPay' : 'DigiPay Payment Confirmation',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                locale.isFrench
+                    ? 'Veuillez finaliser le règlement sur la page sécurisée DigiPay qui vient de s\'ouvrir dans votre navigateur.'
+                    : 'Please complete your transaction on the secure DigiPay checkout tab in your browser.',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                locale.isFrench
+                    ? 'Une fois payé, cliquez sur "Vérifier le paiement" ci-dessous pour confirmer.'
+                    : 'Once paid, tap "Verify Payment" below to immediately confirm.',
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isVerifying ? null : () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+            ),
+            ElevatedButton(
+              onPressed: isVerifying
+                  ? null
+                  : () async {
+                      setDlgState(() => isVerifying = true);
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      try {
+                        final res = await auth.api.verifyPayment(orderId);
+                        final isPaid = res['isPaid'] == true || res['paymentStatus'] == 'paid';
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted) return;
+                        _loadData();
+
+                        scaffoldMessenger.hideCurrentSnackBar();
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isPaid
+                                  ? (locale.isFrench
+                                      ? 'Paiement DigiPay confirmé avec succès !'
+                                      : 'DigiPay payment confirmed successfully!')
+                                  : (res['message'] ??
+                                      (locale.isFrench
+                                          ? 'Paiement toujours en attente chez DigiPay'
+                                          : 'Payment still pending with DigiPay')),
+                            ),
+                            backgroundColor: isPaid ? Colors.green : const Color(0xFFE67E22),
+                          ),
+                        );
+                      } catch (err) {
+                        setDlgState(() => isVerifying = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text(err.toString()), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D7A57),
+                foregroundColor: Colors.white,
+              ),
+              child: isVerifying
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(locale.isFrench ? 'Vérifier le paiement' : 'Verify Payment'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _verifyOrderPayment(String orderId) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    try {
+      final res = await auth.api.verifyPayment(orderId);
+      final isPaid = res['isPaid'] == true || res['paymentStatus'] == 'paid';
+      if (!mounted) return;
+      _loadData();
+      scaffoldMessenger.hideCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            isPaid
+                ? (locale.isFrench ? 'Paiement DigiPay vérifié et confirmé !' : 'DigiPay payment verified and confirmed!')
+                : (res['message'] ??
+                    (locale.isFrench
+                        ? 'Statut DigiPay : En cours de traitement'
+                        : 'DigiPay status: Pending verification')),
+          ),
+          backgroundColor: isPaid ? Colors.green : const Color(0xFFE67E22),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _showModifyOrderDialog(dynamic order) {
@@ -894,7 +1082,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      if (payStatus == 'pending')
+                      if (payStatus == 'pending') ...[
                         ElevatedButton.icon(
                           onPressed: () => _showPaymentDialog(o['id'], o['totalAmount']),
                           icon: const Icon(Icons.payment, size: 16),
@@ -903,6 +1091,17 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                               backgroundColor: const Color(0xFF0D7A57),
                               foregroundColor: Colors.white),
                         ),
+                        if (o['paymentReference'] != null)
+                          OutlinedButton.icon(
+                            onPressed: () => _verifyOrderPayment(o['id']),
+                            icon: const Icon(Icons.verified_outlined, size: 16),
+                            label: Text(locale.isFrench ? 'Vérifier DigiPay' : 'Verify DigiPay'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF0D7A57),
+                              side: const BorderSide(color: Color(0xFF0D7A57)),
+                            ),
+                          ),
+                      ],
                       if (canModify)
                         OutlinedButton.icon(
                           onPressed: () => _showModifyOrderDialog(o),

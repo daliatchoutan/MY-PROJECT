@@ -84,6 +84,9 @@ const ensureDatabaseExists = async () => {
     await safeAddColumn('Orders', 'currency', "VARCHAR(255) DEFAULT 'FCFA'");
     await safeAddColumn('Orders', 'paymentStatus', "ENUM('pending', 'paid', 'failed') DEFAULT 'pending'");
     await safeAddColumn('Orders', 'paymentMethod', 'VARCHAR(255) NULL');
+    await safeAddColumn('Orders', 'paymentProvider', "VARCHAR(64) DEFAULT 'DigiPay'");
+    await safeAddColumn('Orders', 'paymentReference', 'VARCHAR(255) NULL');
+    await safeAddColumn('Orders', 'paymentUrl', 'TEXT NULL');
 
     await safeAddColumn('Deliveries', 'isDelayed', 'TINYINT(1) DEFAULT 0');
     await safeAddColumn('Deliveries', 'delayReason', 'TEXT NULL');

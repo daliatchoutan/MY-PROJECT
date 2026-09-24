@@ -31,6 +31,18 @@ const Order = sequelize.define('Order', {
     type: DataTypes.STRING, // e.g., 'MTN Mobile Money', 'Orange Money', 'Credit Card'
     allowNull: true
   },
+  paymentProvider: {
+    type: DataTypes.STRING,
+    defaultValue: 'DigiPay'
+  },
+  paymentReference: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  paymentUrl: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   shippingAddress: {
     type: DataTypes.TEXT,
     allowNull: false
