@@ -80,8 +80,13 @@ const createPaymentSession = async ({ order, customer, phone, paymentMethod, web
     }
   };
 
-  if (webhookUrl) {
-    payload.webhookUrl = webhookUrl;
+  const effectiveWebhookUrl = webhookUrl ||
+    process.env.DIGIPAY_WEBHOOK_URL ||
+    (process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL.replace(/\/+$/, '')}/api/orders/webhook/digipay` : undefined) ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/orders/webhook/digipay` : undefined);
+
+  if (effectiveWebhookUrl) {
+    payload.webhookUrl = effectiveWebhookUrl;
   }
 
   try {
