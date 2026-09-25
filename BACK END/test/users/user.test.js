@@ -333,5 +333,51 @@ describe('User Governance & Admin Approval Workflow Unit Tests', () => {
       assert.strictEqual(fakeFarmer.approvedBy, 'mgr-id');
       assert(fakeFarmer.save.calledOnce);
     });
+
+    it('should allow Farm Manager to create a farmer account directly', async () => {
+      sinon.stub(User, 'findOne').resolves(null);
+      sinon.stub(User, 'create').resolves({
+        id: 'new-farmer-id',
+        name: 'Direct Farmer',
+        email: 'direct@farmer.com',
+        role: 'Farmer',
+        status: 'active',
+        phone: '677112233',
+        cniNumber: '1122334455',
+        farmerId: 'NOV-FRM-00099',
+        address: 'Bafoussam'
+      });
+      sinon.stub(Farm, 'create').resolves({
+        id: 'farm-123',
+        farmId: 'NOV-FARM-00010',
+        name: 'Highland Farm',
+        location: 'Bafoussam'
+      });
+
+      const req = createMockReq({
+        user: { id: 'mgr-id', role: 'Farm Manager' },
+        body: {
+          name: 'Direct Farmer',
+          email: 'direct@farmer.com',
+          password: 'SecretPassword123!',
+          phone: '677112233',
+          cniNumber: '1122334455',
+          address: 'Bafoussam',
+          farmName: 'Highland Farm',
+          farmLocation: 'Bafoussam'
+        }
+      });
+      const res = createMockRes();
+      const next = createMockNext();
+
+      await adminController.createFarmer(req, res, next);
+
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(res.data.farmer.role, 'Farmer');
+      assert.strictEqual(res.data.farmer.status, 'active');
+      assert.strictEqual(res.data.farmer.name, 'Direct Farmer');
+      assert(User.create.calledOnce);
+      assert(Farm.create.calledOnce);
+    });
   });
 });

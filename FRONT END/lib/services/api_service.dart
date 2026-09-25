@@ -538,6 +538,15 @@ class ApiService {
     return await _processResponse(response);
   }
 
+  Future<Map<String, dynamic>> createFarmer(Map<String, dynamic> farmerData) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/manager/farmers'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode(farmerData),
+    );
+    return await _processResponse(response);
+  }
+
   Future<Map<String, dynamic>> approveFarmer(String id) async {
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/manager/farmers/$id/approve'),

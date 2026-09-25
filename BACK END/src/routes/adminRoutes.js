@@ -23,6 +23,7 @@ router.put('/farm-managers/:id/reject', authorizeRoles('Administrator'), adminCo
 
 // Farmer & Delivery Person approvals (managed by Farm Manager, accessible by Administrator)
 router.get('/farmers', authorizeRoles('Administrator', 'Farm Manager'), adminController.getFarmers);
+router.post('/farmers', authorizeRoles('Administrator', 'Farm Manager'), adminController.createFarmer);
 router.get('/pending-approvals', authorizeRoles('Administrator', 'Farm Manager'), adminController.getPendingApprovals);
 router.put('/farmers/:id/approve', authorizeRoles('Administrator', 'Farm Manager'), adminController.approveFarmer);
 router.put('/farmers/:id/reject', authorizeRoles('Administrator', 'Farm Manager'), adminController.rejectFarmer);

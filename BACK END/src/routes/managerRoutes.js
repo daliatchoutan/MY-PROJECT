@@ -9,6 +9,7 @@ router.use(authorizeRoles('Farm Manager', 'Administrator'));
 
 // Farmers Management
 router.get('/farmers', adminController.getFarmers);
+router.post('/farmers', adminController.createFarmer);
 router.put('/farmers/:id/approve', adminController.approveFarmer);
 router.put('/farmers/:id/reject', adminController.rejectFarmer);
 

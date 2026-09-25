@@ -2477,31 +2477,53 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 locale.isFrench ? 'Gestion des Éleveurs' : 'Farmers Management',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _pendingFarmers.isNotEmpty ? Colors.amber.shade100 : Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _pendingFarmers.isNotEmpty ? Colors.amber.shade700 : Colors.green.shade700,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _showCreateFarmerDialog,
+                    icon: const Icon(Icons.person_add, size: 14),
+                    label: Text(
+                      locale.isFrench ? 'Créer éleveur' : 'New Farmer',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D7A57),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
-                ),
-                child: Text(
-                  '${_pendingFarmers.length} ${locale.isFrench ? 'En attente' : 'Pending'}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _pendingFarmers.isNotEmpty ? Colors.amber.shade900 : Colors.green.shade900,
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _pendingFarmers.isNotEmpty ? Colors.amber.shade100 : Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _pendingFarmers.isNotEmpty ? Colors.amber.shade700 : Colors.green.shade700,
+                      ),
+                    ),
+                    child: Text(
+                      '${_pendingFarmers.length} ${locale.isFrench ? 'En attente' : 'Pending'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _pendingFarmers.isNotEmpty ? Colors.amber.shade900 : Colors.green.shade900,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             locale.isFrench
-                ? 'En tant que chef d\'exploitation, vous validez ou refusez les demandes d\'adhésion des éleveurs.'
-                : 'As Farm Manager, you review and validate or decline farmer account applications.',
+                ? 'En tant que chef d\'exploitation, vous validez ou refusez les demandes des éleveurs, et vous pouvez créer directement un compte éleveur.'
+                : 'As Farm Manager, you review and approve farmer applications, and can directly create farmer accounts.',
             style: const TextStyle(color: Colors.grey, fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -2620,9 +2642,22 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
 
           const SizedBox(height: 20),
           // Active Farmers Directory
-          Text(
-            locale.isFrench ? 'Répertoire des Éleveurs Actifs' : 'Active Farmers Directory',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                locale.isFrench ? 'Répertoire des Éleveurs Actifs' : 'Active Farmers Directory',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              TextButton.icon(
+                onPressed: _showCreateFarmerDialog,
+                icon: const Icon(Icons.person_add, size: 16, color: Color(0xFF0D7A57)),
+                label: Text(
+                  locale.isFrench ? 'Ajouter éleveur' : 'Add Farmer',
+                  style: const TextStyle(color: Color(0xFF0D7A57), fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           if (_managedFarmers.isEmpty)
@@ -2641,6 +2676,236 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
               );
             }),
         ],
+      ),
+    );
+  }
+
+  void _showCreateFarmerDialog() {
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController(text: 'Farmer123!');
+    final phoneCtrl = TextEditingController();
+    final cniCtrl = TextEditingController();
+    final addressCtrl = TextEditingController();
+    final farmNameCtrl = TextEditingController();
+    final farmLocCtrl = TextEditingController();
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D7A57).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person_add_alt_1, color: Color(0xFF0D7A57), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  locale.isFrench ? 'Créer un Compte Éleveur' : 'Create Farmer Account',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    locale.isFrench
+                        ? 'Créez directement un compte pour un éleveur sous votre supervision.'
+                        : 'Directly provision a farmer account under your farm management.',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Nom complet de l\'éleveur *' : 'Farmer Full Name *',
+                      prefixIcon: const Icon(Icons.person_outline, size: 20),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Adresse Email *' : 'Email Address *',
+                      prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Mot de passe temporaire *' : 'Temporary Password *',
+                      prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Numéro de téléphone' : 'Phone Number',
+                      prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                      hintText: '6XXXXXXXX',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: cniCtrl,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Numéro CNI' : 'National ID (CNI)',
+                      prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: addressCtrl,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Ville / Adresse' : 'City / Location',
+                      prefixIcon: const Icon(Icons.location_city_outlined, size: 20),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(),
+                  Text(
+                    locale.isFrench ? 'Ferme associée (optionnel)' : 'Associated Farm (optional)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0D7A57)),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: farmNameCtrl,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Nom de la ferme' : 'Farm Name',
+                      prefixIcon: const Icon(Icons.agriculture, size: 20),
+                      hintText: locale.isFrench ? 'Ex: Ferme Avicole Espoir' : 'Ex: Hope Poultry Farm',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: farmLocCtrl,
+                    decoration: InputDecoration(
+                      labelText: locale.isFrench ? 'Localisation de la ferme' : 'Farm Location',
+                      prefixIcon: const Icon(Icons.pin_drop_outlined, size: 20),
+                      hintText: locale.isFrench ? 'Ex: Obala, Région du Centre' : 'Ex: Obala, Centre Region',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Annuler' : 'Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final email = emailCtrl.text.trim();
+                      final password = passCtrl.text.trim();
+
+                      if (name.isEmpty || email.isEmpty || password.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(locale.isFrench
+                                ? 'Veuillez remplir le nom, l\'email et le mot de passe.'
+                                : 'Please fill in name, email, and password.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDlgState(() => isSaving = true);
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+
+                      try {
+                        final res = await auth.api.createFarmer({
+                          'name': name,
+                          'email': email,
+                          'password': password,
+                          'phone': phoneCtrl.text.trim(),
+                          'cniNumber': cniCtrl.text.trim(),
+                          'address': addressCtrl.text.trim(),
+                          'farmName': farmNameCtrl.text.trim(),
+                          'farmLocation': farmLocCtrl.text.trim(),
+                        });
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted) return;
+
+                        final farmerId = res['farmer']?['farmerId'] ?? '';
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(locale.isFrench
+                                ? 'Compte éleveur créé avec succès ! ($farmerId)'
+                                : 'Farmer account created successfully! ($farmerId)'),
+                            backgroundColor: const Color(0xFF0D7A57),
+                          ),
+                        );
+
+                        _loadFarmerData();
+                      } catch (e) {
+                        setDlgState(() => isSaving = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString().replaceAll('Exception: ', '')),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D7A57),
+                foregroundColor: Colors.white,
+              ),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(locale.isFrench ? 'Créer l\'éleveur' : 'Create Farmer'),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -93,6 +93,77 @@ const getFarmers = async (req, res, next) => {
   }
 };
 
+const createFarmer = async (req, res, next) => {
+  try {
+    const { generateFarmerId, generateFarmId } = require('../utils/idGenerator');
+    const { name, email, password, phone, cniNumber, address, farmName, farmLocation } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required.' });
+    }
+
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email is already registered.' });
+    }
+
+    if (cniNumber) {
+      const existingCni = await User.findOne({ where: { cniNumber } });
+      if (existingCni) {
+        return res.status(400).json({ message: 'CNI Number is already registered to another account.' });
+      }
+    }
+
+    const farmerId = await generateFarmerId(User);
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: 'Farmer',
+      phone: phone || null,
+      cniNumber: cniNumber || null,
+      farmerId,
+      address: address || null,
+      status: 'active',
+      approvedAt: new Date(),
+      approvedBy: req.user ? req.user.id : null
+    });
+
+    let farm = null;
+    if (farmName && farmLocation) {
+      const generatedFarmId = await generateFarmId(Farm);
+      farm = await Farm.create({
+        farmId: generatedFarmId,
+        name: farmName,
+        location: farmLocation,
+        farmerId: user.id,
+        status: 'approved',
+        approvedAt: new Date(),
+        approvedBy: req.user ? req.user.id : null
+      });
+    }
+
+    return res.status(201).json({
+      message: 'Farmer account created successfully.',
+      farmer: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        phone: user.phone,
+        cniNumber: user.cniNumber,
+        farmerId: user.farmerId,
+        address: user.address,
+        farm: farm ? { id: farm.id, farmId: farm.farmId, name: farm.name, location: farm.location } : null
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getFarmManagers = async (req, res, next) => {
   try {
     const farmManagers = await User.findAll({
@@ -584,6 +655,7 @@ module.exports = {
   getFarmers,
   getFarmManagers,
   createUser,
+  createFarmer,
   updateUser,
   setUserStatus,
   getPendingApprovals,
