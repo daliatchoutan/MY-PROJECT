@@ -40,7 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   String _selectedRole = 'Customer';
 
-  final List<String> _roles = ['Customer', 'Farmer', 'Delivery Person'];
+  final List<String> _roles = ['Customer', 'Farmer', 'Farm Manager', 'Delivery Person'];
   final List<String> _vehicleTypes = ['Motorcycle', 'Car', 'Van', 'Bicycle', 'Walking / On Foot'];
 
   @override
@@ -166,6 +166,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       Widget targetScreen;
       switch (auth.role) {
         case 'Farmer':
+        case 'Farm Manager':
           targetScreen = const FarmerDashboard();
           break;
         case 'Customer':
@@ -297,8 +298,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Farmer accounts have immediate active access. You can add one or multiple poultry farms directly from your dashboard after registration.',
+                            'Farmer registration serves as an operational application submitted for review and approval by the Farm Manager. CNI and phone are required.',
                             style: TextStyle(color: Color(0xFF1B5E20), fontSize: 12, height: 1.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ] else if (_selectedRole == 'Farm Manager') ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3F2FD),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF64B5F6)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.manage_accounts, color: Color(0xFF1565C0)),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Farm Manager accounts oversee operations, manage farms, and approve Farmer & Courier applications. Verified and approved directly by the Administrator.',
+                            style: TextStyle(color: Color(0xFF0D47A1), fontSize: 12, height: 1.3),
                           ),
                         ),
                       ],
@@ -320,7 +344,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Delivery accounts receive instant access to delivery jobs. Profile picture is completely optional.',
+                            'Delivery courier registration serves as an application reviewed and approved by the Farm Manager. CNI, phone, and vehicle information are required.',
                             style: TextStyle(color: Color(0xFFBF360C), fontSize: 12, height: 1.3),
                           ),
                         ),

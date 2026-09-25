@@ -35,7 +35,12 @@ const verifyToken = async (req, res, next) => {
 
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const effectiveRoles = [...roles];
+    if (roles.includes('Farmer') && !effectiveRoles.includes('Farm Manager')) {
+      effectiveRoles.push('Farm Manager');
+    }
+
+    if (!req.user || !effectiveRoles.includes(req.user.role)) {
       return res.status(403).json({ 
         message: `Forbidden. Role '${req.user?.role}' is not authorized to perform this action.` 
       });

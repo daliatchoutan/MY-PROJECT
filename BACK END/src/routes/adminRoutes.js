@@ -4,24 +4,31 @@ const adminController = require('../controllers/adminController');
 const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 
 router.use(verifyToken);
-router.use(authorizeRoles('Administrator'));
 
-router.get('/stats', adminController.getDashboardStats);
-router.get('/reports', adminController.getReports);
-router.get('/farmers', adminController.getFarmers);
-router.get('/users', adminController.getAllUsers);
-router.post('/users', adminController.createUser);
-router.put('/users/:id', adminController.updateUser);
-router.put('/users/:id/status', adminController.setUserStatus);
-router.delete('/users/:id', adminController.deleteUser);
+// Administrator-only management & statistics
+router.get('/stats', authorizeRoles('Administrator'), adminController.getDashboardStats);
+router.get('/reports', authorizeRoles('Administrator'), adminController.getReports);
+router.get('/users', authorizeRoles('Administrator'), adminController.getAllUsers);
+router.post('/users', authorizeRoles('Administrator'), adminController.createUser);
+router.put('/users/:id', authorizeRoles('Administrator'), adminController.updateUser);
+router.put('/users/:id/status', authorizeRoles('Administrator'), adminController.setUserStatus);
+router.delete('/users/:id', authorizeRoles('Administrator'), adminController.deleteUser);
+router.put('/farms/:id/approve', authorizeRoles('Administrator'), adminController.approveFarm);
+router.put('/farms/:id/reject', authorizeRoles('Administrator'), adminController.rejectFarm);
 
-// Pending approvals and approval workflow
-router.get('/pending-approvals', adminController.getPendingApprovals);
-router.put('/farmers/:id/approve', adminController.approveFarmer);
-router.put('/farmers/:id/reject', adminController.rejectFarmer);
-router.put('/deliveries/:id/approve', adminController.approveDeliveryPerson);
-router.put('/deliveries/:id/reject', adminController.rejectDeliveryPerson);
-router.put('/farms/:id/approve', adminController.approveFarm);
-router.put('/farms/:id/reject', adminController.rejectFarm);
+// Farm Manager validation (Administrator approves/rejects Farm Managers)
+router.get('/farm-managers', authorizeRoles('Administrator'), adminController.getFarmManagers);
+router.put('/farm-managers/:id/approve', authorizeRoles('Administrator'), adminController.approveFarmManager);
+router.put('/farm-managers/:id/reject', authorizeRoles('Administrator'), adminController.rejectFarmManager);
+
+// Farmer & Delivery Person approvals (managed by Farm Manager, accessible by Administrator)
+router.get('/farmers', authorizeRoles('Administrator', 'Farm Manager'), adminController.getFarmers);
+router.get('/pending-approvals', authorizeRoles('Administrator', 'Farm Manager'), adminController.getPendingApprovals);
+router.put('/farmers/:id/approve', authorizeRoles('Administrator', 'Farm Manager'), adminController.approveFarmer);
+router.put('/farmers/:id/reject', authorizeRoles('Administrator', 'Farm Manager'), adminController.rejectFarmer);
+router.put('/deliveries/:id/approve', authorizeRoles('Administrator', 'Farm Manager'), adminController.approveDeliveryPerson);
+router.put('/deliveries/:id/reject', authorizeRoles('Administrator', 'Farm Manager'), adminController.rejectDeliveryPerson);
+router.put('/drivers/:id/approve', authorizeRoles('Administrator', 'Farm Manager'), adminController.approveDeliveryPerson);
+router.put('/drivers/:id/reject', authorizeRoles('Administrator', 'Farm Manager'), adminController.rejectDeliveryPerson);
 
 module.exports = router;

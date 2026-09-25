@@ -2,6 +2,17 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final Map<String, dynamic>? data;
+
+  ApiException(this.message, {this.statusCode, this.data});
+
+  @override
+  String toString() => message;
+}
+
 class ApiService {
   final String? token;
 
@@ -9,14 +20,20 @@ class ApiService {
 
   // Generic Request Helper
   Future<dynamic> _processResponse(http.Response response) async {
-    final body = jsonDecode(response.body);
+    dynamic body;
+    try {
+      body = jsonDecode(response.body);
+    } catch (_) {
+      body = {'message': response.body};
+    }
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return body;
     } else {
       final message = body is Map && body.containsKey('message') 
           ? body['message'] 
           : 'HTTP Error ${response.statusCode}';
-      throw Exception(message);
+      throw ApiException(message.toString(), statusCode: response.statusCode, data: body is Map<String, dynamic> ? body : null);
     }
   }
 
@@ -483,5 +500,84 @@ class ApiService {
       headers: ApiConfig.headers(token),
     );
     await _processResponse(response);
+  }
+
+  // --- Farm Managers Management (Administrator) ---
+  Future<List<dynamic>> getFarmManagers() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/admin/farm-managers'),
+      headers: ApiConfig.headers(token),
+    );
+    final data = await _processResponse(response);
+    return data['farmManagers'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> approveFarmManager(String id) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/admin/farm-managers/$id/approve'),
+      headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> rejectFarmManager(String id, String reason) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/admin/farm-managers/$id/reject'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'reason': reason}),
+    );
+    return await _processResponse(response);
+  }
+
+  // --- Farmers & Couriers Approval Workflow (Farm Manager & Administrator) ---
+  Future<Map<String, dynamic>> getPendingApprovals() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/manager/pending-approvals'),
+      headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> approveFarmer(String id) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/manager/farmers/$id/approve'),
+      headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> rejectFarmer(String id, String reason) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/manager/farmers/$id/reject'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'reason': reason}),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<List<dynamic>> getDeliveryPersons() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/manager/drivers'),
+      headers: ApiConfig.headers(token),
+    );
+    final data = await _processResponse(response);
+    return data['drivers'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> approveDeliveryPerson(String id) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/manager/drivers/$id/approve'),
+      headers: ApiConfig.headers(token),
+    );
+    return await _processResponse(response);
+  }
+
+  Future<Map<String, dynamic>> rejectDeliveryPerson(String id, String reason) async {
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/manager/drivers/$id/reject'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode({'reason': reason}),
+    );
+    return await _processResponse(response);
   }
 }

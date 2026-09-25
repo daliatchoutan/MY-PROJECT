@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/language_switcher.dart';
 import '../../utils/product_helper.dart';
 import '../notifications_screen.dart';
@@ -339,6 +340,21 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                       _showPaymentDialog(orderId, orderTotal);
                     } catch (e) {
                       setSheetState(() => isPlacingOrder = false);
+                      if (e is ApiException) {
+                        final dynamic errData = e.data;
+                        if (errData is Map && errData['availableProducts'] != null) {
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            _loadData();
+                            final unavail = errData['unavailableProduct']?.toString() ??
+                                (locale.isFrench ? 'Produit commandé' : 'Ordered product');
+                            final avail = List<dynamic>.from(errData['availableProducts'] ?? []);
+                            _showUnavailableProductsDialog(unavail, avail);
+                          }
+                          return;
+                        }
+                      }
+
                       if (ctx.mounted) {
                         showDialog(
                           context: ctx,
@@ -374,6 +390,150 @@ class _CustomerDashboardState extends State<CustomerDashboard>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showUnavailableProductsDialog(String unavailableProduct, List<dynamic> availableProducts) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final cart = Provider.of<CartProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.remove_shopping_cart, color: Colors.red, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                locale.isFrench ? 'Produit Indisponible' : 'Product Unavailable',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  locale.isFrench
+                      ? 'Désolé, le produit "$unavailableProduct" n\'est actuellement plus disponible en stock.'
+                      : 'Sorry, the product "$unavailableProduct" is currently out of stock or unavailable.',
+                  style: TextStyle(color: Colors.red.shade900, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                locale.isFrench
+                    ? 'Découvrez nos autres produits disponibles :'
+                    : 'Discover our available alternatives:',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.45,
+                ),
+                child: availableProducts.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          locale.isFrench
+                              ? 'Aucun autre produit disponible actuellement.'
+                              : 'No alternative products currently in stock.',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: availableProducts.length,
+                        separatorBuilder: (_, index) => const Divider(height: 1),
+                        itemBuilder: (c, idx) {
+                          final prod = availableProducts[idx];
+                          final stock = prod['stockQuantity'] ?? 0;
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: ProductHelper.buildProductImage(prod, fit: BoxFit.cover),
+                              ),
+                            ),
+                            title: Text(
+                              prod['name'] ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${prod['price']} FCFA • En stock: $stock',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF0D7A57)),
+                            ),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D7A57),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onPressed: () {
+                                cart.addItem(
+                                  productId: prod['id'],
+                                  name: prod['name'],
+                                  price: double.parse(prod['price'].toString()),
+                                  unit: prod['unit'] ?? 'unit',
+                                );
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${prod['name']} ${locale.isFrench ? "ajouté au panier !" : "added to cart!"}'),
+                                    backgroundColor: const Color(0xFF0D7A57),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                locale.isFrench ? '+ Ajouter' : '+ Add',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+          ),
+        ],
       ),
     );
   }
@@ -929,6 +1089,11 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                   itemCount: _products.length,
                   itemBuilder: (ctx, idx) {
                     final p = _products[idx];
+                    final dynamic stockRaw = p['stockQuantity'];
+                    final int stock = (stockRaw is num)
+                        ? stockRaw.toInt()
+                        : int.tryParse(stockRaw?.toString() ?? '10') ?? 10;
+                    final bool isAvailable = (p['isAvailable'] != false) && (stock > 0);
 
                     return Card(
                       elevation: 3,
@@ -951,6 +1116,23 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                                       begin: Alignment.topCenter,
                                       end: Alignment.bottomCenter,
                                       colors: [Colors.transparent, Colors.black.withValues(alpha: 0.20)],
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 6,
+                                  left: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isAvailable ? const Color(0xFF0D7A57) : Colors.red.shade700,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      isAvailable
+                                          ? (locale.isFrench ? 'En stock ($stock)' : 'In Stock ($stock)')
+                                          : (locale.isFrench ? 'Rupture' : 'Out of Stock'),
+                                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ),
@@ -995,32 +1177,44 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
-                                    onPressed: () {
-                                      cart.addItem(
-                                        productId: p['id'],
-                                        name: p['name'],
-                                        price: double.parse(p['price'].toString()),
-                                        unit: p['unit'] ?? 'unit',
-                                      );
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      messenger.hideCurrentSnackBar();
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text('${p['name']} ${locale.isFrench ? 'ajouté au panier !' : 'added to cart!'}'),
-                                          duration: const Duration(seconds: 3),
-                                          action: SnackBarAction(
-                                            label: locale.isFrench ? 'VOIR LE PANIER' : 'VIEW CART',
-                                            textColor: Colors.amberAccent,
-                                            onPressed: _showCartSheet,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.add_shopping_cart, size: 14),
-                                    label: Text(locale.tr('add_to_cart'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    onPressed: !isAvailable
+                                        ? null
+                                        : () {
+                                            cart.addItem(
+                                              productId: p['id'],
+                                              name: p['name'],
+                                              price: double.parse(p['price'].toString()),
+                                              unit: p['unit'] ?? 'unit',
+                                            );
+                                            final messenger = ScaffoldMessenger.of(context);
+                                            messenger.hideCurrentSnackBar();
+                                            messenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text('${p['name']} ${locale.isFrench ? 'ajouté au panier !' : 'added to cart!'}'),
+                                                duration: const Duration(seconds: 3),
+                                                action: SnackBarAction(
+                                                  label: locale.isFrench ? 'VOIR LE PANIER' : 'VIEW CART',
+                                                  textColor: Colors.amberAccent,
+                                                  onPressed: _showCartSheet,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                    icon: Icon(
+                                      isAvailable ? Icons.add_shopping_cart : Icons.remove_shopping_cart,
+                                      size: 14,
+                                    ),
+                                    label: Text(
+                                      isAvailable
+                                          ? locale.tr('add_to_cart')
+                                          : (locale.isFrench ? 'Épuisé' : 'Out of Stock'),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0D7A57),
+                                      backgroundColor: isAvailable ? const Color(0xFF0D7A57) : Colors.grey.shade400,
                                       foregroundColor: Colors.white,
+                                      disabledBackgroundColor: Colors.grey.shade300,
+                                      disabledForegroundColor: Colors.grey.shade600,
                                       padding: const EdgeInsets.symmetric(vertical: 8),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),

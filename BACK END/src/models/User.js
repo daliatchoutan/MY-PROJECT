@@ -25,7 +25,7 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   role: {
-    type: DataTypes.ENUM('Administrator', 'Farmer', 'Customer', 'Delivery Person'),
+    type: DataTypes.ENUM('Administrator', 'Farmer', 'Customer', 'Delivery Person', 'Farm Manager'),
     allowNull: false,
     defaultValue: 'Customer'
   },
@@ -56,6 +56,11 @@ const User = sequelize.define('User', {
   },
   cniNumber: {
     type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
+  farmManagerId: {
+    type: DataTypes.STRING(64),
     allowNull: true,
     unique: true
   },

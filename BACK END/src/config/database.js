@@ -58,6 +58,12 @@ const ensureDatabaseExists = async () => {
       await connection.query("ALTER TABLE `Users` MODIFY COLUMN `status` ENUM('pending', 'active', 'rejected', 'suspended', 'blocked') NOT NULL DEFAULT 'active'");
     } catch (e) {}
 
+    try {
+      await connection.query("ALTER TABLE `Users` MODIFY COLUMN `role` ENUM('Administrator', 'Farmer', 'Customer', 'Delivery Person', 'Farm Manager') NOT NULL DEFAULT 'Customer'");
+    } catch (e) {}
+
+    await safeAddColumn('Users', 'farmManagerId', 'VARCHAR(64) NULL UNIQUE');
+
     await safeAddColumn('Users', 'rejectionReason', 'TEXT NULL');
     await safeAddColumn('Users', 'approvedAt', 'DATETIME NULL');
     await safeAddColumn('Users', 'approvedBy', 'CHAR(36) NULL');

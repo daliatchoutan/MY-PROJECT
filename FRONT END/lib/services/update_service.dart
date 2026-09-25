@@ -6,8 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config/api_config.dart';
 
 class UpdateService {
-  static const int currentBuildNumber = 2;
-  static const String currentVersion = '1.0.1';
+  static const int currentBuildNumber = 3;
+  static const String currentVersion = '1.0.2';
 
   static Future<void> checkForUpdates(BuildContext context, {bool showNoUpdateSnack = false}) async {
     // Only check for native mobile APK updates (Web PWA updates silently in the browser)

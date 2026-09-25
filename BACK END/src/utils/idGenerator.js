@@ -49,6 +49,45 @@ async function generateFarmerId(UserModel) {
   }
 }
 
+async function generateFarmManagerId(UserModel) {
+  const prefix = 'NOV-MGR-';
+  try {
+    const lastUser = await UserModel.findOne({
+      where: {
+        farmManagerId: {
+          [Op.like]: `${prefix}%`
+        }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    let nextNumber = 1;
+    if (lastUser && lastUser.farmManagerId) {
+      const parts = lastUser.farmManagerId.split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastNum)) {
+        nextNumber = lastNum + 1;
+      }
+    } else {
+      const count = await UserModel.count({ where: { role: 'Farm Manager' } });
+      nextNumber = count + 1;
+    }
+
+    let candidate = `${prefix}${String(nextNumber).padStart(5, '0')}`;
+    let exists = await UserModel.findOne({ where: { farmManagerId: candidate } });
+    while (exists) {
+      nextNumber++;
+      candidate = `${prefix}${String(nextNumber).padStart(5, '0')}`;
+      exists = await UserModel.findOne({ where: { farmManagerId: candidate } });
+    }
+
+    return candidate;
+  } catch (err) {
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+    return `${prefix}${randomSuffix}`;
+  }
+}
+
 async function generateDeliveryPersonId(UserModel) {
   const prefix = 'NOV-DRV-';
   try {
@@ -129,6 +168,7 @@ async function generateFarmId(FarmModel) {
 
 module.exports = {
   generateFarmerId,
+  generateFarmManagerId,
   generateDeliveryPersonId,
   generateFarmId
 };

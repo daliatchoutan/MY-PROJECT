@@ -252,5 +252,86 @@ describe('User Governance & Admin Approval Workflow Unit Tests', () => {
       assert.strictEqual(fakeDriver.rejectionReason, 'Driver license expired');
       assert(fakeDriver.save.calledOnce);
     });
+
+    it('should approve farm manager account by Administrator', async () => {
+      const fakeManager = {
+        id: 'mgr-pending',
+        name: 'Manager Robert',
+        role: 'Farm Manager',
+        status: 'pending',
+        farmManagerId: 'NOV-MGR-00001',
+        save: sinon.stub().resolves()
+      };
+      sinon.stub(User, 'findOne').resolves(fakeManager);
+      sinon.stub(Notification, 'create').resolves({});
+
+      const req = createMockReq({
+        params: { id: 'mgr-pending' },
+        user: { id: 'admin-id', role: 'Administrator' }
+      });
+      const res = createMockRes();
+      const next = createMockNext();
+
+      await adminController.approveFarmManager(req, res, next);
+
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(fakeManager.status, 'active');
+      assert.strictEqual(fakeManager.rejectionReason, null);
+      assert(fakeManager.save.calledOnce);
+    });
+
+    it('should reject farm manager account with reason by Administrator', async () => {
+      const fakeManager = {
+        id: 'mgr-declined',
+        name: 'Declined Manager',
+        role: 'Farm Manager',
+        status: 'pending',
+        save: sinon.stub().resolves()
+      };
+      sinon.stub(User, 'findOne').resolves(fakeManager);
+      sinon.stub(Notification, 'create').resolves({});
+
+      const req = createMockReq({
+        params: { id: 'mgr-declined' },
+        user: { id: 'admin-id', role: 'Administrator' },
+        body: { reason: 'CNI verification failed' }
+      });
+      const res = createMockRes();
+      const next = createMockNext();
+
+      await adminController.rejectFarmManager(req, res, next);
+
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(fakeManager.status, 'rejected');
+      assert.strictEqual(fakeManager.rejectionReason, 'CNI verification failed');
+      assert(fakeManager.save.calledOnce);
+    });
+
+    it('should allow Farm Manager to approve farmer account', async () => {
+      const fakeFarmer = {
+        id: 'farmer-app-1',
+        name: 'Applicant Farmer',
+        role: 'Farmer',
+        status: 'pending',
+        save: sinon.stub().resolves()
+      };
+      sinon.stub(User, 'findOne').resolves(fakeFarmer);
+      sinon.stub(Farm, 'update').resolves([1]);
+      sinon.stub(Notification, 'create').resolves({});
+
+      const req = createMockReq({
+        params: { id: 'farmer-app-1' },
+        user: { id: 'mgr-id', role: 'Farm Manager' }
+      });
+      const res = createMockRes();
+      const next = createMockNext();
+
+      await adminController.approveFarmer(req, res, next);
+
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(fakeFarmer.status, 'active');
+      assert.strictEqual(fakeFarmer.approvedBy, 'mgr-id');
+      assert(fakeFarmer.save.calledOnce);
+    });
   });
 });

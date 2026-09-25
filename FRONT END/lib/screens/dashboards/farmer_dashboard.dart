@@ -26,13 +26,25 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   List<dynamic> _orders = [];
   List<dynamic> _notifications = [];
   Map<String, dynamic> _liveReadings = {};
+  List<dynamic> _managedFarmers = [];
+  List<dynamic> _managedCouriers = [];
+  List<dynamic> _pendingFarmers = [];
+  List<dynamic> _pendingCouriers = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final isManager = auth.role == 'Farm Manager';
+    _tabController = TabController(length: isManager ? 7 : 5, vsync: this);
     _loadFarmerData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFarmerData() async {
@@ -51,6 +63,21 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
         readings[dev['id']] = reading;
       }
 
+      List<dynamic> managedFarmers = [];
+      List<dynamic> managedCouriers = [];
+      List<dynamic> pendingFarmers = [];
+      List<dynamic> pendingCouriers = [];
+
+      if (auth.role == 'Farm Manager') {
+        try {
+          final pending = await auth.api.getPendingApprovals();
+          managedFarmers = await auth.api.getFarmers();
+          managedCouriers = await auth.api.getDeliveryPersons();
+          pendingFarmers = (pending['pendingFarmers'] as List<dynamic>?) ?? [];
+          pendingCouriers = (pending['pendingDrivers'] as List<dynamic>?) ?? [];
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           _farms = farms;
@@ -59,6 +86,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
           _orders = orders;
           _notifications = notifs;
           _liveReadings = readings;
+          _managedFarmers = managedFarmers;
+          _managedCouriers = managedCouriers;
+          _pendingFarmers = pendingFarmers;
+          _pendingCouriers = pendingCouriers;
           _isLoading = false;
         });
       }
@@ -444,9 +475,9 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                                               final picker = ImagePicker();
                                               final picked = await picker.pickImage(
                                                 source: ImageSource.gallery,
-                                                maxWidth: 1024,
-                                                maxHeight: 1024,
-                                                imageQuality: 85,
+                                                maxWidth: 800,
+                                                maxHeight: 800,
+                                                imageQuality: 80,
                                               );
                                               if (picked != null) {
                                                 final bytes = await picked.readAsBytes();
@@ -459,7 +490,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                                             } catch (e) {
                                               if (context.mounted) {
                                                 ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Picker error: $e')),
+                                                  SnackBar(content: Text(locale.isFrench ? 'Erreur galerie: $e' : 'Gallery error: $e')),
                                                 );
                                               }
                                             }
@@ -482,9 +513,9 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                                               final picker = ImagePicker();
                                               final picked = await picker.pickImage(
                                                 source: ImageSource.camera,
-                                                maxWidth: 1024,
-                                                maxHeight: 1024,
-                                                imageQuality: 85,
+                                                maxWidth: 800,
+                                                maxHeight: 800,
+                                                imageQuality: 80,
                                               );
                                               if (picked != null) {
                                                 final bytes = await picked.readAsBytes();
@@ -494,7 +525,13 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                                                   pickedImageBase64 = base64;
                                                 });
                                               }
-                                            } catch (_) {}
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text(locale.isFrench ? 'Erreur caméra: $e' : 'Camera error: $e')),
+                                                );
+                                              }
+                                            }
                                           },
                                     icon: const Icon(Icons.camera_alt, size: 14),
                                     label: Text(locale.isFrench ? 'Caméra' : 'Camera', style: const TextStyle(fontSize: 11)),
@@ -747,34 +784,78 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 6),
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  try {
-                                    final picker = ImagePicker();
-                                    final picked = await picker.pickImage(
-                                      source: ImageSource.gallery,
-                                      maxWidth: 1024,
-                                      maxHeight: 1024,
-                                      imageQuality: 85,
-                                    );
-                                    if (picked != null) {
-                                      final bytes = await picked.readAsBytes();
-                                      final base64 = base64Encode(bytes);
-                                      setDialogState(() {
-                                        pickedImageBytes = bytes;
-                                        pickedImageBase64 = base64;
-                                      });
-                                    }
-                                  } catch (_) {}
-                                },
-                                icon: const Icon(Icons.photo_library, size: 14),
-                                label: Text(locale.isFrench ? 'Changer l\'image' : 'Change Image', style: const TextStyle(fontSize: 11)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0D7A57),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  minimumSize: Size.zero,
-                                ),
+                              Row(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      try {
+                                        final picker = ImagePicker();
+                                        final picked = await picker.pickImage(
+                                          source: ImageSource.gallery,
+                                          maxWidth: 800,
+                                          maxHeight: 800,
+                                          imageQuality: 80,
+                                        );
+                                        if (picked != null) {
+                                          final bytes = await picked.readAsBytes();
+                                          final base64 = base64Encode(bytes);
+                                          setDialogState(() {
+                                            pickedImageBytes = bytes;
+                                            pickedImageBase64 = base64;
+                                          });
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(locale.isFrench ? 'Erreur galerie: $e' : 'Gallery error: $e')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    icon: const Icon(Icons.photo_library, size: 14),
+                                    label: Text(locale.isFrench ? 'Galerie' : 'Gallery', style: const TextStyle(fontSize: 11)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0D7A57),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  OutlinedButton.icon(
+                                    onPressed: () async {
+                                      try {
+                                        final picker = ImagePicker();
+                                        final picked = await picker.pickImage(
+                                          source: ImageSource.camera,
+                                          maxWidth: 800,
+                                          maxHeight: 800,
+                                          imageQuality: 80,
+                                        );
+                                        if (picked != null) {
+                                          final bytes = await picked.readAsBytes();
+                                          final base64 = base64Encode(bytes);
+                                          setDialogState(() {
+                                            pickedImageBytes = bytes;
+                                            pickedImageBase64 = base64;
+                                          });
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text(locale.isFrench ? 'Erreur caméra: $e' : 'Camera error: $e')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    icon: const Icon(Icons.camera_alt, size: 14),
+                                    label: Text(locale.isFrench ? 'Caméra' : 'Camera', style: const TextStyle(fontSize: 11)),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1326,7 +1407,13 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     final unreadNotifs = _notifications.where((n) => !(n['isRead'] ?? false)).length;
     final avatarUrl = auth.user?['avatarUrl'];
 
-    final farmerId = auth.user?['farmerId'];
+    final isManager = auth.role == 'Farm Manager';
+    final roleTitle = isManager
+        ? (locale.isFrench ? 'Chef d\'exploitation' : 'Farm Manager')
+        : locale.tr('role_farmer');
+    final displayId = isManager
+        ? (auth.user?['farmManagerId'] ?? auth.user?['farmerId'])
+        : auth.user?['farmerId'];
 
     return Scaffold(
       appBar: AppBar(
@@ -1340,11 +1427,11 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                locale.tr('role_farmer'),
+                roleTitle,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (farmerId != null && farmerId.toString().isNotEmpty) ...[
+            if (displayId != null && displayId.toString().isNotEmpty) ...[
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -1354,7 +1441,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                   border: Border.all(color: Colors.white54),
                 ),
                 child: Text(
-                  farmerId.toString(),
+                  displayId.toString(),
                   style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                 ),
               ),
@@ -1420,6 +1507,16 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             Tab(icon: const Icon(Icons.warning_amber), text: locale.tr('tab_alerts')),
             Tab(icon: const Icon(Icons.inventory), text: locale.tr('tab_products')),
             Tab(icon: const Icon(Icons.shopping_basket), text: locale.tr('tab_orders')),
+            if (isManager) ...[
+              Tab(
+                icon: const Icon(Icons.group),
+                text: locale.isFrench ? 'Éleveurs' : 'Farmers',
+              ),
+              Tab(
+                icon: const Icon(Icons.two_wheeler),
+                text: locale.isFrench ? 'Livreurs' : 'Couriers',
+              ),
+            ],
           ],
         ),
       ),
@@ -1433,6 +1530,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 _buildAiAlertsTab(),
                 _buildProductsTab(),
                 _buildOrdersTab(),
+                if (isManager) ...[
+                  _buildFarmersManagementTab(),
+                  _buildCouriersManagementTab(),
+                ],
               ],
             ),
     );
@@ -2356,6 +2457,481 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFarmersManagementTab() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context);
+
+    return RefreshIndicator(
+      onRefresh: _loadFarmerData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                locale.isFrench ? 'Gestion des Éleveurs' : 'Farmers Management',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _pendingFarmers.isNotEmpty ? Colors.amber.shade100 : Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _pendingFarmers.isNotEmpty ? Colors.amber.shade700 : Colors.green.shade700,
+                  ),
+                ),
+                child: Text(
+                  '${_pendingFarmers.length} ${locale.isFrench ? 'En attente' : 'Pending'}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _pendingFarmers.isNotEmpty ? Colors.amber.shade900 : Colors.green.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            locale.isFrench
+                ? 'En tant que chef d\'exploitation, vous validez ou refusez les demandes d\'adhésion des éleveurs.'
+                : 'As Farm Manager, you review and validate or decline farmer account applications.',
+            style: const TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+
+          // Pending Applications Section
+          Text(
+            locale.isFrench ? 'Demandes en attente d\'approbation' : 'Pending Farmer Applications',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0D7A57)),
+          ),
+          const SizedBox(height: 8),
+          if (_pendingFarmers.isEmpty)
+            Card(
+              elevation: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Center(
+                  child: Text(
+                    locale.isFrench ? 'Aucune candidature d\'éleveur en attente.' : 'No pending farmer applications.',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._pendingFarmers.map((f) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: Colors.amber.shade400, width: 1.5),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Colors.amber.shade100,
+                            child: Icon(Icons.person, color: Colors.amber.shade900),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(f['name'] ?? 'Farmer Applicant', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                Text(f['email'] ?? '', style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                                if (f['phone'] != null) Text('Phone: ${f['phone']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.amber)),
+                            child: const Text('PENDING', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 10)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        children: [
+                          if (f['cniNumber'] != null)
+                            Text('CNI: ${f['cniNumber']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0D7A57))),
+                          if (f['professionalLicenseNumber'] != null && f['professionalLicenseNumber'].toString().isNotEmpty)
+                            Text('License: ${f['professionalLicenseNumber']}', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                          if (f['farmerId'] != null)
+                            Text('ID: ${f['farmerId']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _promptRejectFarmer(f['id'], f['name']),
+                            icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                            label: Text(locale.isFrench ? 'Refuser' : 'Decline', style: const TextStyle(color: Colors.red, fontSize: 12)),
+                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                await auth.api.approveFarmer(f['id']);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(locale.isFrench ? 'Éleveur approuvé avec succès !' : 'Farmer approved successfully!'),
+                                      backgroundColor: const Color(0xFF0D7A57),
+                                    ),
+                                  );
+                                  _loadFarmerData();
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.check_circle, size: 16),
+                            label: Text(locale.isFrench ? 'Valider' : 'Approve', style: const TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D7A57), foregroundColor: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+
+          const SizedBox(height: 20),
+          // Active Farmers Directory
+          Text(
+            locale.isFrench ? 'Répertoire des Éleveurs Actifs' : 'Active Farmers Directory',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          if (_managedFarmers.isEmpty)
+            Center(child: Text(locale.isFrench ? 'Aucun éleveur actif.' : 'No active farmers.'))
+          else
+            ..._managedFarmers.map((f) {
+              final farmCount = f['farms']?.length ?? 0;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(backgroundColor: Colors.green.shade100, child: const Icon(Icons.agriculture, color: Color(0xFF0D7A57))),
+                  title: Text(f['name'] ?? 'Farmer'),
+                  subtitle: Text('${f['email']} | Phone: ${f['phone'] ?? 'N/A'}\nFarms: $farmCount | CNI: ${f['cniNumber'] ?? 'N/A'}'),
+                  isThreeLine: true,
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  void _promptRejectFarmer(String farmerId, String? farmerName) {
+    final reasonCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Decline Farmer Application: ${farmerName ?? ''}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please provide the reason for declining this farmer application:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'e.g. CNI unverified, farm location not validated...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final reason = reasonCtrl.text.trim();
+              Navigator.pop(ctx);
+              try {
+                await auth.api.rejectFarmer(farmerId, reason.isNotEmpty ? reason : 'Application declined by Farm Manager');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Farmer application declined.'), backgroundColor: Colors.orange),
+                  );
+                  _loadFarmerData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Decline'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCouriersManagementTab() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context);
+
+    return RefreshIndicator(
+      onRefresh: _loadFarmerData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                locale.isFrench ? 'Gestion des Livreurs' : 'Couriers Management',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _pendingCouriers.isNotEmpty ? Colors.amber.shade100 : Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _pendingCouriers.isNotEmpty ? Colors.amber.shade700 : Colors.green.shade700,
+                  ),
+                ),
+                child: Text(
+                  '${_pendingCouriers.length} ${locale.isFrench ? 'En attente' : 'Pending'}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _pendingCouriers.isNotEmpty ? Colors.amber.shade900 : Colors.green.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            locale.isFrench
+                ? 'En tant que chef d\'exploitation, vous validez ou refusez les demandes des livreurs.'
+                : 'As Farm Manager, you review and validate or decline logistics courier applications.',
+            style: const TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+
+          // Pending Courier Applications Section
+          Text(
+            locale.isFrench ? 'Candidatures de Livreurs en attente' : 'Pending Courier Applications',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0D7A57)),
+          ),
+          const SizedBox(height: 8),
+          if (_pendingCouriers.isEmpty)
+            Card(
+              elevation: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Center(
+                  child: Text(
+                    locale.isFrench ? 'Aucune candidature de livreur en attente.' : 'No pending courier applications.',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._pendingCouriers.map((d) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: Colors.amber.shade400, width: 1.5),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Colors.amber.shade100,
+                            child: Icon(Icons.two_wheeler, color: Colors.amber.shade900),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(d['name'] ?? 'Courier Applicant', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                Text(d['email'] ?? '', style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                                if (d['phone'] != null) Text('Phone: ${d['phone']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.amber)),
+                            child: const Text('PENDING', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 10)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        children: [
+                          if (d['cniNumber'] != null)
+                            Text('CNI: ${d['cniNumber']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0D7A57))),
+                          if (d['vehicleType'] != null)
+                            Text('Vehicle: ${d['vehicleType']}', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                          if (d['vehiclePlateNumber'] != null)
+                            Text('Plate: ${d['vehiclePlateNumber']}', style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                          if (d['deliveryPersonId'] != null)
+                            Text('ID: ${d['deliveryPersonId']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _promptRejectCourier(d['id'], d['name']),
+                            icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                            label: Text(locale.isFrench ? 'Refuser' : 'Decline', style: const TextStyle(color: Colors.red, fontSize: 12)),
+                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                await auth.api.approveDeliveryPerson(d['id']);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(locale.isFrench ? 'Livreur approuvé avec succès !' : 'Courier approved successfully!'),
+                                      backgroundColor: const Color(0xFF0D7A57),
+                                    ),
+                                  );
+                                  _loadFarmerData();
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.check_circle, size: 16),
+                            label: Text(locale.isFrench ? 'Valider' : 'Approve', style: const TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D7A57), foregroundColor: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+
+          const SizedBox(height: 20),
+          // Active Couriers Directory
+          Text(
+            locale.isFrench ? 'Répertoire des Livreurs Actifs' : 'Active Couriers Directory',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          if (_managedCouriers.isEmpty)
+            Center(child: Text(locale.isFrench ? 'Aucun livreur actif.' : 'No active couriers.'))
+          else
+            ..._managedCouriers.map((d) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(backgroundColor: Colors.blue.shade100, child: const Icon(Icons.delivery_dining, color: Colors.blue)),
+                  title: Text(d['name'] ?? 'Courier'),
+                  subtitle: Text('${d['email']} | Phone: ${d['phone'] ?? 'N/A'}\nVehicle: ${d['vehicleType'] ?? 'N/A'} (${d['vehiclePlateNumber'] ?? 'N/A'})'),
+                  isThreeLine: true,
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  void _promptRejectCourier(String courierId, String? courierName) {
+    final reasonCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Decline Courier Application: ${courierName ?? ''}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please provide the reason for declining this courier application:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Invalid license, plate number mismatch...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final reason = reasonCtrl.text.trim();
+              Navigator.pop(ctx);
+              try {
+                await auth.api.rejectDeliveryPerson(courierId, reason.isNotEmpty ? reason : 'Application declined by Farm Manager');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Courier application declined.'), backgroundColor: Colors.orange),
+                  );
+                  _loadFarmerData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Decline'),
+          ),
+        ],
       ),
     );
   }

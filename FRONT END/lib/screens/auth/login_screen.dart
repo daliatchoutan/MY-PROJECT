@@ -77,6 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
     Widget targetScreen;
     switch (role) {
       case 'Farmer':
+      case 'Farm Manager':
         targetScreen = const FarmerDashboard();
         break;
       case 'Customer':

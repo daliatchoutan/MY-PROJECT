@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
-const { generateFarmerId, generateDeliveryPersonId } = require('../utils/idGenerator');
+const { generateFarmerId, generateDeliveryPersonId, generateFarmManagerId } = require('../utils/idGenerator');
 
 const register = async (req, res, next) => {
   try {
@@ -37,15 +37,15 @@ const register = async (req, res, next) => {
       });
     }
 
-    const validPublicRoles = ['Customer', 'Farmer', 'Delivery Person'];
+    const validPublicRoles = ['Customer', 'Farmer', 'Delivery Person', 'Farm Manager'];
     const assignedRole = validPublicRoles.includes(role) ? role : 'Customer';
 
-    // Farmer and Delivery Person require CNI & phone
-    if ((assignedRole === 'Farmer' || assignedRole === 'Delivery Person') && (!cniNumber || !cniNumber.trim())) {
+    // Farmer, Delivery Person, and Farm Manager require CNI & phone
+    if (['Farmer', 'Delivery Person', 'Farm Manager'].includes(assignedRole) && (!cniNumber || !cniNumber.trim())) {
       return res.status(400).json({ message: 'CNI / National ID Card Number is required.' });
     }
 
-    if ((assignedRole === 'Farmer' || assignedRole === 'Delivery Person') && (!phone || !phone.trim())) {
+    if (['Farmer', 'Delivery Person', 'Farm Manager'].includes(assignedRole) && (!phone || !phone.trim())) {
       return res.status(400).json({ message: 'Phone number is required.' });
     }
 
@@ -64,18 +64,22 @@ const register = async (req, res, next) => {
       }
     }
 
-    // Generate unique system IDs for Farmer and Delivery Person
+    // Generate unique system IDs
     let generatedFarmerId = null;
     let generatedDeliveryPersonId = null;
+    let generatedFarmManagerId = null;
 
     if (assignedRole === 'Farmer') {
       generatedFarmerId = await generateFarmerId(User);
     } else if (assignedRole === 'Delivery Person') {
       generatedDeliveryPersonId = await generateDeliveryPersonId(User);
+    } else if (assignedRole === 'Farm Manager') {
+      generatedFarmManagerId = await generateFarmManagerId(User);
+      generatedFarmerId = await generateFarmerId(User); // Farm Manager inherits farmer capabilities
     }
 
-    // Status is active immediately for all normal roles (Farmer, Delivery Person, Customer)
-    const initialStatus = 'active';
+    // Customer status is active immediately; Farmer, Delivery Person, and Farm Manager submit applications (pending review)
+    const initialStatus = assignedRole === 'Customer' ? 'active' : 'pending';
 
     const user = await User.create({
       name: name.trim(),
@@ -86,6 +90,7 @@ const register = async (req, res, next) => {
       phone: phone ? phone.trim() : null,
       cniNumber: cleanCni,
       farmerId: generatedFarmerId,
+      farmManagerId: generatedFarmManagerId,
       professionalLicenseNumber: professionalLicenseNumber ? professionalLicenseNumber.trim() : null,
       deliveryPersonId: generatedDeliveryPersonId,
       driverLicenseNumber: driverLicenseNumber ? driverLicenseNumber.trim() : null,
@@ -112,6 +117,7 @@ const register = async (req, res, next) => {
         status: user.status,
         phone: user.phone,
         cniNumber: user.cniNumber,
+        farmManagerId: user.farmManagerId,
         farmerId: user.farmerId,
         professionalLicenseNumber: user.professionalLicenseNumber,
         deliveryPersonId: user.deliveryPersonId,
@@ -175,6 +181,7 @@ const login = async (req, res, next) => {
         avatarUrl: user.avatarUrl,
         phone: user.phone,
         cniNumber: user.cniNumber,
+        farmManagerId: user.farmManagerId,
         farmerId: user.farmerId,
         professionalLicenseNumber: user.professionalLicenseNumber,
         deliveryPersonId: user.deliveryPersonId,

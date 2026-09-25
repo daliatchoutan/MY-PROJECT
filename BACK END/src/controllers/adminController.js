@@ -4,6 +4,7 @@ const getDashboardStats = async (req, res, next) => {
   try {
     const totalUsers = await User.count();
     const totalFarmers = await User.count({ where: { role: 'Farmer' } });
+    const totalFarmManagers = await User.count({ where: { role: 'Farm Manager' } });
     const totalCustomers = await User.count({ where: { role: 'Customer' } });
     const totalDrivers = await User.count({ where: { role: 'Delivery Person' } });
     const totalFarms = await Farm.count();
@@ -18,6 +19,7 @@ const getDashboardStats = async (req, res, next) => {
       stats: {
         totalUsers,
         totalFarmers,
+        totalFarmManagers,
         totalCustomers,
         totalDrivers,
         totalFarms,
@@ -86,6 +88,20 @@ const getFarmers = async (req, res, next) => {
     });
 
     return res.json({ farmers });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getFarmManagers = async (req, res, next) => {
+  try {
+    const farmManagers = await User.findAll({
+      where: { role: 'Farm Manager' },
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']]
+    });
+
+    return res.json({ farmManagers });
   } catch (error) {
     next(error);
   }
@@ -213,30 +229,114 @@ const setUserStatus = async (req, res, next) => {
 
 const getPendingApprovals = async (req, res, next) => {
   try {
-    const pendingFarmers = await User.findAll({
+    const pendingFarmers = (await User.findAll({
       where: { role: 'Farmer', status: 'pending' },
       attributes: { exclude: ['password'] },
       include: [{ model: Farm, as: 'farms' }],
       order: [['createdAt', 'DESC']]
-    });
+    })) || [];
 
-    const pendingDrivers = await User.findAll({
+    const pendingDrivers = (await User.findAll({
       where: { role: 'Delivery Person', status: 'pending' },
       attributes: { exclude: ['password'] },
       order: [['createdAt', 'DESC']]
-    });
+    })) || [];
 
-    const pendingFarms = await Farm.findAll({
+    const pendingFarms = (await Farm.findAll({
       where: { status: 'pending' },
       include: [{ model: User, as: 'farmer', attributes: ['id', 'name', 'email', 'phone'] }],
       order: [['createdAt', 'DESC']]
-    });
+    })) || [];
+
+    const pendingFarmManagers = (await User.findAll({
+      where: { role: 'Farm Manager', status: 'pending' },
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']]
+    })) || [];
 
     return res.json({
       pendingFarmers,
       pendingDrivers,
       pendingFarms,
-      totalPending: pendingFarmers.length + pendingDrivers.length + pendingFarms.length
+      pendingFarmManagers,
+      totalPending: pendingFarmers.length + pendingDrivers.length + pendingFarms.length + pendingFarmManagers.length
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const approveFarmManager = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const manager = await User.findOne({ where: { id, role: 'Farm Manager' } });
+    if (!manager) {
+      return res.status(404).json({ message: 'Farm Manager not found.' });
+    }
+
+    manager.status = 'active';
+    manager.approvedAt = new Date();
+    manager.approvedBy = req.user.id;
+    manager.rejectionReason = null;
+    await manager.save();
+
+    await Notification.create({
+      userId: manager.id,
+      title: 'Farm Manager Account Approved! Welcome to NOVARA Operations',
+      message: 'Your Farm Manager account has been verified and approved by the Administrator. You now have full operational oversight and approval authority over Farmers and Logistics Couriers.',
+      type: 'system'
+    });
+
+    return res.json({
+      message: 'Farm Manager account approved successfully.',
+      farmManager: {
+        id: manager.id,
+        name: manager.name,
+        email: manager.email,
+        role: manager.role,
+        status: manager.status,
+        farmManagerId: manager.farmManagerId,
+        approvedAt: manager.approvedAt
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const rejectFarmManager = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const manager = await User.findOne({ where: { id, role: 'Farm Manager' } });
+    if (!manager) {
+      return res.status(404).json({ message: 'Farm Manager not found.' });
+    }
+
+    const rejectionReason = reason && reason.trim().length > 0
+      ? reason.trim()
+      : 'Farm Manager registration details could not be validated or did not meet administrator criteria.';
+
+    manager.status = 'rejected';
+    manager.rejectionReason = rejectionReason;
+    await manager.save();
+
+    await Notification.create({
+      userId: manager.id,
+      title: 'Farm Manager Application Declined',
+      message: `Your Farm Manager application was declined. Reason: ${rejectionReason}`,
+      type: 'system'
+    });
+
+    return res.json({
+      message: 'Farm Manager registration rejected.',
+      farmManager: {
+        id: manager.id,
+        name: manager.name,
+        email: manager.email,
+        status: manager.status,
+        rejectionReason: manager.rejectionReason
+      }
     });
   } catch (error) {
     next(error);
@@ -482,10 +582,13 @@ module.exports = {
   getReports,
   getAllUsers,
   getFarmers,
+  getFarmManagers,
   createUser,
   updateUser,
   setUserStatus,
   getPendingApprovals,
+  approveFarmManager,
+  rejectFarmManager,
   approveFarmer,
   rejectFarmer,
   approveDeliveryPerson,

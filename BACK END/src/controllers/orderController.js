@@ -49,8 +49,39 @@ const createOrder = async (req, res, next) => {
       }
 
       if (!product) {
+        let availableProducts = [];
+        try {
+          availableProducts = await Product.findAll({
+            where: { isAvailable: true },
+            attributes: ['id', 'name', 'price', 'stockQuantity', 'unit', 'category', 'imageUrl'],
+            limit: 10,
+            transaction
+          });
+        } catch (_) {}
         await transaction.rollback();
-        return res.status(404).json({ message: 'No available products found for this order.' });
+        return res.status(404).json({
+          message: 'No available products found for this order.',
+          unavailableProduct: item.name || 'Selected product',
+          availableProducts: availableProducts || []
+        });
+      }
+
+      if (product.isAvailable === false) {
+        let availableProducts = [];
+        try {
+          availableProducts = await Product.findAll({
+            where: { isAvailable: true },
+            attributes: ['id', 'name', 'price', 'stockQuantity', 'unit', 'category', 'imageUrl'],
+            limit: 10,
+            transaction
+          });
+        } catch (_) {}
+        await transaction.rollback();
+        return res.status(400).json({
+          message: `The product '${product.name}' is currently not available.`,
+          unavailableProduct: product.name,
+          availableProducts: availableProducts || []
+        });
       }
 
       if (product.stockQuantity < item.quantity) {

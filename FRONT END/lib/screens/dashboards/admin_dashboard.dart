@@ -19,7 +19,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   Map<String, dynamic> _stats = {};
   Map<String, dynamic> _reports = {};
   List<dynamic> _users = [];
-  List<dynamic> _farmers = [];
+  List<dynamic> _farmManagers = [];
   bool _isLoading = true;
 
   @override
@@ -36,13 +36,13 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
       final stats = await auth.api.getAdminStats();
       final reports = await auth.api.getReports();
       final users = await auth.api.getAllUsers();
-      final farmers = await auth.api.getFarmers();
+      final farmManagers = await auth.api.getFarmManagers();
       if (mounted) {
         setState(() {
           _stats = stats;
           _reports = reports;
           _users = users;
-          _farmers = farmers;
+          _farmManagers = farmManagers;
           _isLoading = false;
         });
       }
@@ -69,7 +69,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
               DropdownButtonFormField<String>(
                 initialValue: selectedRole,
                 decoration: const InputDecoration(labelText: 'Role'),
-                items: ['Administrator', 'Farmer', 'Customer', 'Delivery Person']
+                items: ['Administrator', 'Farm Manager', 'Farmer', 'Customer', 'Delivery Person']
                     .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                     .toList(),
                 onChanged: (val) => selectedRole = val!,
@@ -224,7 +224,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
           indicatorColor: Colors.amber,
           tabs: const [
             Tab(icon: Icon(Icons.analytics), text: 'Reports & Revenue'),
-            Tab(icon: Icon(Icons.agriculture), text: 'Farmers Directory'),
+            Tab(icon: Icon(Icons.manage_accounts), text: 'Farm Managers'),
             Tab(icon: Icon(Icons.people), text: 'User Governance'),
           ],
         ),
@@ -235,7 +235,7 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
               controller: _tabController,
               children: [
                 _buildReportsTab(),
-                _buildFarmersTab(),
+                _buildFarmManagersTab(),
                 _buildUsersTab(),
               ],
             ),
@@ -334,26 +334,267 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     );
   }
 
-  Widget _buildFarmersTab() {
-    return _farmers.isEmpty
-        ? const Center(child: Text('No farmers registered in directory.'))
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _farmers.length,
-            itemBuilder: (ctx, idx) {
-              final f = _farmers[idx];
-              final farmsCount = f['farms']?.length ?? 0;
+  Widget _buildFarmManagersTab() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final pendingManagers = _farmManagers.where((m) => m['status'] == 'pending').toList();
+
+    return RefreshIndicator(
+      onRefresh: _loadAdminData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Farm Managers Governance',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: pendingManagers.isNotEmpty ? Colors.amber.shade100 : Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: pendingManagers.isNotEmpty ? Colors.amber.shade700 : Colors.green.shade700,
+                  ),
+                ),
+                child: Text(
+                  '${pendingManagers.length} Pending Approval',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: pendingManagers.isNotEmpty ? Colors.amber.shade900 : Colors.green.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Administrators validate or deny Farm Manager accounts. Once validated, Farm Managers govern operational farmers and logistics couriers.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          if (_farmManagers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: Text('No Farm Manager accounts registered yet.')),
+            )
+          else
+            ..._farmManagers.map((m) {
+              final status = m['status'] ?? 'pending';
+              final isPending = status == 'pending';
+              final isRejected = status == 'rejected';
+              final isActive = status == 'active';
+
+              Color statusColor = Colors.grey;
+              if (isActive) statusColor = Colors.green;
+              if (isPending) statusColor = Colors.amber.shade800;
+              if (isRejected) statusColor = Colors.red;
 
               return Card(
-                child: ListTile(
-                  leading: CircleAvatar(backgroundColor: Colors.green.shade100, child: Icon(Icons.agriculture, color: Colors.green.shade800)),
-                  title: Text(f['name'] ?? 'Farmer'),
-                  subtitle: Text('${f['email']} | Phone: ${f['phone'] ?? 'N/A'}\nOperates $farmsCount farm(s)'),
-                  isThreeLine: true,
+                margin: const EdgeInsets.only(bottom: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: isPending ? Colors.amber.shade300 : Colors.grey.shade200,
+                    width: isPending ? 1.5 : 1,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: isPending ? Colors.amber.shade100 : Colors.blue.shade100,
+                            radius: 22,
+                            child: Icon(
+                              Icons.manage_accounts,
+                              color: isPending ? Colors.amber.shade900 : Colors.blue.shade800,
+                              size: 26,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  m['name'] ?? 'Farm Manager',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  m['email'] ?? '',
+                                  style: const TextStyle(color: Colors.black87, fontSize: 13),
+                                ),
+                                if (m['phone'] != null && m['phone'].toString().isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Phone: ${m['phone']}',
+                                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                  ),
+                                ],
+                                if (m['cniNumber'] != null && m['cniNumber'].toString().isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'CNI / ID: ${m['cniNumber']}',
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF0D7A57)),
+                                  ),
+                                ],
+                                if (m['farmManagerId'] != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Manager Code: ${m['farmManagerId']}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                            ),
+                            child: Text(
+                              status.toUpperCase(),
+                              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (isRejected && m['rejectionReason'] != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Reason: ${m['rejectionReason']}',
+                            style: TextStyle(color: Colors.red.shade900, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                      if (isPending) ...[
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _promptRejectManager(m['id'], m['name']),
+                              icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                              label: const Text('Deny', style: TextStyle(color: Colors.red, fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.red),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                try {
+                                  await auth.api.approveFarmManager(m['id']);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Farm Manager ${m['name']} approved successfully!'),
+                                        backgroundColor: const Color(0xFF0D7A57),
+                                      ),
+                                    );
+                                    _loadAdminData();
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error approving manager: $e'), backgroundColor: Colors.red),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.check_circle, size: 16),
+                              label: const Text('Validate & Approve', style: TextStyle(fontSize: 12)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D7A57),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               );
+            }),
+        ],
+      ),
+    );
+  }
+
+  void _promptRejectManager(String managerId, String? managerName) {
+    final reasonCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Decline Farm Manager: ${managerName ?? ''}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please provide the reason for declining this Farm Manager application:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'e.g. CNI document unverified, criteria not met...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final reason = reasonCtrl.text.trim();
+              Navigator.pop(ctx);
+              try {
+                await auth.api.rejectFarmManager(managerId, reason.isNotEmpty ? reason : 'Criteria not met');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: const Text('Farm Manager application declined.'), backgroundColor: Colors.orange.shade800),
+                  );
+                  _loadAdminData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error declining manager: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
             },
-          );
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Decline Application'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildUsersTab() {

@@ -20,6 +20,7 @@ const orderRoutes = require('./src/routes/orderRoutes');
 const deliveryRoutes = require('./src/routes/deliveryRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
+const managerRoutes = require('./src/routes/managerRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -59,16 +60,15 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
-
-
+app.use('/api/manager', managerRoutes);
 
 // App Version check for automated in-app OTA updates
 app.get('/api/app/version', (req, res) => {
   const versionInfo = {
     appName: 'NOVARA Smart Poultry Farm',
-    version: '1.0.1',
-    buildNumber: 2,
-    releaseNotes: '• Simplified Farmer Registration without upfront farm requirement\n• Enhanced order delivery traceability & status indicators\n• Instant CNI & verification tracking on profile\n• Automated in-app update system',
+    version: '1.0.2',
+    buildNumber: 3,
+    releaseNotes: '• Resolved Android photo upload & camera permissions in APK\n• Added Farm Manager operational role & multi-tier governance\n• Live stock tracking & out-of-stock alternative recommendations\n• Updated Pinterest-grade feed photography\n• Automated in-app update system',
     apkDownloadUrl: `${req.protocol}://${req.get('host')}/download/novara-latest.apk`,
     webAppUrl: 'https://novara-poultry.netlify.app/',
     forceUpdate: false,
@@ -201,6 +201,126 @@ const initDatabase = async () => {
         admin.password = '11111111';
         await admin.save();
         console.log(` Administrator 'Ben' (${adminEmail}) verified and updated with active role.`);
+      }
+
+      // Ensure default farm and initial products exist if catalog is empty
+      const { Farm, Product } = require('./src/models');
+      const productCount = await Product.count();
+      if (productCount === 0) {
+        let demoFarm = await Farm.findOne({ where: { status: 'approved' } });
+        if (!demoFarm) {
+          demoFarm = await Farm.create({
+            name: 'NOVARA Demonstration Poultry Farm',
+            location: 'Yaoundé - Obala Agro-Hub',
+            capacity: 5000,
+            flockType: 'Broilers & Layers',
+            farmerId: admin ? admin.id : null,
+            status: 'approved'
+          });
+        }
+
+        await Product.bulkCreate([
+          {
+            farmId: demoFarm.id,
+            name: 'Live Broiler Chicken',
+            description: 'Healthy, prime-weight broiler chicken ready for fresh processing.',
+            price: 4500,
+            stockQuantity: 250,
+            unit: 'bird',
+            category: 'Live Poultry',
+            imageUrl: '/uploads/products/product_broiler.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Layer Hen (Point of Lay)',
+            description: 'Vaccinated point-of-lay layer hen for high-yield egg production.',
+            price: 6000,
+            stockQuantity: 200,
+            unit: 'bird',
+            category: 'Live Poultry',
+            imageUrl: '/uploads/products/product_layer.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Day-old Chicks (Pack of 50)',
+            description: 'Certified vaccinated day-old broiler and layer chicks.',
+            price: 35000,
+            stockQuantity: 150,
+            unit: 'pack',
+            category: 'Live Poultry',
+            imageUrl: '/uploads/products/product_chicks.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Mature Rooster (Cockerel)',
+            description: 'Vigorous, mature cockerel for quality breeding and culinary delight.',
+            price: 6500,
+            stockQuantity: 100,
+            unit: 'bird',
+            category: 'Live Poultry',
+            imageUrl: '/uploads/products/product_rooster.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Farm-Fresh Whole Chicken',
+            description: 'Dressed and chilled farm-fresh chicken, inspected for highest quality.',
+            price: 4000,
+            stockQuantity: 180,
+            unit: 'chicken',
+            category: 'Poultry Meat',
+            imageUrl: '/uploads/products/product_fresh_chicken.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Fresh Chicken Breast & Cuts',
+            description: 'Boneless tender cuts, hygienic and vacuum sealed.',
+            price: 3500,
+            stockQuantity: 160,
+            unit: 'kg',
+            category: 'Poultry Meat',
+            imageUrl: '/uploads/products/product_meat.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Organic Brown Eggs (Tray of 30)',
+            description: 'Locally collected organic brown eggs from grain-fed hens.',
+            price: 3500,
+            stockQuantity: 400,
+            unit: 'tray',
+            category: 'Eggs',
+            imageUrl: '/uploads/products/product_brown_eggs.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Farm-Fresh Table Eggs (Pack of 12)',
+            description: 'Carefully sorted table eggs in eco-friendly carton packaging.',
+            price: 1500,
+            stockQuantity: 350,
+            unit: 'pack',
+            category: 'Eggs',
+            imageUrl: '/uploads/products/product_eggs.jpg',
+            isAvailable: true
+          },
+          {
+            farmId: demoFarm.id,
+            name: 'Nutritional Poultry Feed (Starter & Finisher)',
+            description: 'Balanced protein-dense poultry feed with essential micronutrients.',
+            price: 18500,
+            stockQuantity: 120,
+            unit: '50kg bag',
+            category: 'Poultry Feed',
+            imageUrl: '/uploads/products/product_feed.jpg',
+            isAvailable: true
+          }
+        ]);
+        console.log(' Default poultry products catalog automatically initialized with live stock.');
       }
     } catch (adminErr) {
       console.error('Notice ensuring Administrator Ben:', adminErr.message);
