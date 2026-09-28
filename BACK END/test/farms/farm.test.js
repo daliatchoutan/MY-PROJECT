@@ -79,6 +79,32 @@ describe('Farm Management Unit Tests', () => {
       assert.strictEqual(res.statusCode, 201);
       assert.strictEqual(res.data.farm.farmerId, 'target-farmer-id');
     });
+
+    it('should allow Farm Manager to specify farmerId when creating a farm', async () => {
+      const fakeFarm = {
+        id: 'farm-manager-created',
+        name: 'Manager Assigned Farm',
+        location: 'Bafoussam',
+        farmerId: 'supervised-farmer-id'
+      };
+      sinon.stub(Farm, 'create').resolves(fakeFarm);
+
+      const req = createMockReq({
+        user: { id: 'manager-id', role: 'Farm Manager' },
+        body: {
+          name: 'Manager Assigned Farm',
+          location: 'Bafoussam',
+          farmerId: 'supervised-farmer-id'
+        }
+      });
+      const res = createMockRes();
+      const next = createMockNext();
+
+      await farmController.createFarm(req, res, next);
+
+      assert.strictEqual(res.statusCode, 201);
+      assert.strictEqual(res.data.farm.farmerId, 'supervised-farmer-id');
+    });
   });
 
   describe('getFarms', () => {

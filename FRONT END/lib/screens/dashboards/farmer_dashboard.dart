@@ -102,41 +102,68 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     final nameCtrl = TextEditingController();
     final locCtrl = TextEditingController();
     final capCtrl = TextEditingController(text: '1000');
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final isManager = auth.role == 'Farm Manager' || auth.role == 'Administrator';
+    String? selectedFarmerId;
     bool isSaving = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add New Poultry Farm'),
+          title: Text(locale.isFrench ? 'Ajouter une Ferme Avicole' : 'Add New Poultry Farm'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (isManager && _managedFarmers.isNotEmpty) ...[
+                DropdownButtonFormField<String?>(
+                  value: selectedFarmerId,
+                  items: [
+                    DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text(locale.isFrench ? 'Moi-même (Chef d\'exploitation)' : 'Myself (Farm Manager)'),
+                    ),
+                    ..._managedFarmers.map<DropdownMenuItem<String?>>((f) => DropdownMenuItem(
+                          value: f['id'].toString(),
+                          child: Text('${f['name']} (${f['email']})', overflow: TextOverflow.ellipsis),
+                        )),
+                  ],
+                  onChanged: (val) => setDialogState(() => selectedFarmerId = val),
+                  decoration: InputDecoration(
+                    labelText: locale.isFrench ? 'Attribuer à l\'éleveur' : 'Assign to Farmer',
+                    prefixIcon: const Icon(Icons.person_outline),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Farm Name *',
+                decoration: InputDecoration(
+                  labelText: locale.isFrench ? 'Nom de la Ferme *' : 'Farm Name *',
                   hintText: 'e.g. Green Valley Farm',
                 ),
               ),
               TextField(
                 controller: locCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Location / Region *',
+                decoration: InputDecoration(
+                  labelText: locale.isFrench ? 'Localisation / Région *' : 'Location / Region *',
                   hintText: 'e.g. Yaounde, Obala',
                 ),
               ),
               TextField(
                 controller: capCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Max Poultry Capacity'),
+                decoration: InputDecoration(
+                  labelText: locale.isFrench ? 'Capacité maximale' : 'Max Poultry Capacity',
+                ),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: isSaving ? null : () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(locale.isFrench ? 'Annuler' : 'Cancel'),
             ),
             ElevatedButton(
               onPressed: isSaving
@@ -146,8 +173,10 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                       final location = locCtrl.text.trim();
                       if (name.isEmpty || location.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Farm Name and Location are required.'),
+                          SnackBar(
+                            content: Text(locale.isFrench
+                                ? 'Le nom et la localisation de la ferme sont requis.'
+                                : 'Farm Name and Location are required.'),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -155,20 +184,23 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                       }
 
                       setDialogState(() => isSaving = true);
-                      final auth = Provider.of<AuthProvider>(context, listen: false);
                       final scaffoldMessenger = ScaffoldMessenger.of(context);
 
                       try {
-                        await auth.api.createFarm({
+                        final payload = <String, dynamic>{
                           'name': name,
                           'location': location,
                           'capacity': int.tryParse(capCtrl.text) ?? 1000,
-                        });
+                        };
+                        if (selectedFarmerId != null) {
+                          payload['farmerId'] = selectedFarmerId;
+                        }
+                        await auth.api.createFarm(payload);
                         if (ctx.mounted) Navigator.pop(ctx);
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Farm created successfully!'),
-                            backgroundColor: Color(0xFF0D7A57),
+                          SnackBar(
+                            content: Text(locale.isFrench ? 'Ferme créée avec succès !' : 'Farm created successfully!'),
+                            backgroundColor: const Color(0xFF0D7A57),
                           ),
                         );
                         if (!mounted) return;
