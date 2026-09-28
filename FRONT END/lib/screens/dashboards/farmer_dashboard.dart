@@ -1066,6 +1066,280 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     }
   }
 
+  void _showGeminiAnalysisDialog() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final picker = ImagePicker();
+
+    Uint8List? selectedImageBytes;
+    String? selectedBase64;
+    String? selectedDeviceSerial;
+    String? selectedFarmId = _farms.isNotEmpty ? _farms.first['id']?.toString() : null;
+    bool isAnalyzing = false;
+    Map<String, dynamic>? diagnosisResult;
+
+    final camDevices = _devices.where((d) =>
+        (d['type']?.toString().toLowerCase().contains('cam') ?? false) ||
+        (d['deviceSerial']?.toString().toLowerCase().contains('cam') ?? false)).toList();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: Color(0xFF0D7A57)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  locale.isFrench ? 'Diagnostic Sanitaire & Comportement Gemini IA' : 'Gemini AI Poultry Vision & Health',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    locale.isFrench
+                        ? 'Analysez la posture, le plumage, les symptômes respiratoires et le comportement du troupeau via Google Gemini Vision :'
+                        : 'Analyze flock posture, plumage, respiratory symptoms, and behavior using Google Gemini Multimodal Vision:',
+                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 170,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: selectedImageBytes != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.memory(selectedImageBytes!, fit: BoxFit.cover),
+                          )
+                        : Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.camera_enhance, size: 44, color: Colors.grey.shade400),
+                                const SizedBox(height: 8),
+                                Text(
+                                  locale.isFrench ? 'Sélectionnez une photo ou flux ESP32-CAM' : 'Select a photo or ESP32-CAM stream',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: isAnalyzing ? null : () async {
+                          final picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+                          if (picked != null) {
+                            final bytes = await picked.readAsBytes();
+                            setDlgState(() {
+                              selectedImageBytes = bytes;
+                              selectedBase64 = base64Encode(bytes);
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.camera_alt, size: 16),
+                        label: Text(locale.isFrench ? 'Appareil Photo' : 'Camera'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: isAnalyzing ? null : () async {
+                          final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+                          if (picked != null) {
+                            final bytes = await picked.readAsBytes();
+                            setDlgState(() {
+                              selectedImageBytes = bytes;
+                              selectedBase64 = base64Encode(bytes);
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.photo_library, size: 16),
+                        label: Text(locale.isFrench ? 'Galerie' : 'Gallery'),
+                      ),
+                      if (camDevices.isNotEmpty)
+                        OutlinedButton.icon(
+                          onPressed: isAnalyzing ? null : () {
+                            setDlgState(() {
+                              selectedDeviceSerial = camDevices.first['deviceSerial'];
+                            });
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text('ESP32-CAM (${camDevices.first['name']}) sélectionné pour analyse.'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.videocam, size: 16),
+                          label: Text(locale.isFrench ? 'Flux ESP32-CAM' : 'ESP32-CAM Feed'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_farms.isNotEmpty) ...[
+                    DropdownButtonFormField<String>(
+                      value: selectedFarmId,
+                      decoration: InputDecoration(
+                        labelText: locale.isFrench ? 'Ferme cible' : 'Target Farm',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      items: _farms.map<DropdownMenuItem<String>>((f) {
+                        return DropdownMenuItem<String>(
+                          value: f['id']?.toString(),
+                          child: Text(f['name'] ?? 'Farm'),
+                        );
+                      }).toList(),
+                      onChanged: isAnalyzing ? null : (val) => setDlgState(() => selectedFarmId = val),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (diagnosisResult != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: diagnosisResult!['healthStatus'] == 'healthy'
+                            ? Colors.green.shade50
+                            : (diagnosisResult!['healthStatus'] == 'warning' ? Colors.orange.shade50 : Colors.red.shade50),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: diagnosisResult!['healthStatus'] == 'healthy'
+                              ? Colors.green.shade300
+                              : (diagnosisResult!['healthStatus'] == 'warning' ? Colors.orange.shade300 : Colors.red.shade300),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                diagnosisResult!['healthStatus'] == 'healthy'
+                                    ? Icons.check_circle
+                                    : Icons.warning_amber_rounded,
+                                color: diagnosisResult!['healthStatus'] == 'healthy'
+                                    ? Colors.green.shade800
+                                    : Colors.orange.shade800,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${diagnosisResult!['abnormalityDetected']} (${((diagnosisResult!['confidence'] ?? 0.9) * 100).toInt()}%)',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(diagnosisResult!['flockBehaviorSummary'] ?? '', style: const TextStyle(fontSize: 13)),
+                          if (diagnosisResult!['symptoms'] != null && (diagnosisResult!['symptoms'] as List).isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 4,
+                              children: (diagnosisResult!['symptoms'] as List).map<Widget>((s) {
+                                return Chip(
+                                  label: Text(s.toString(), style: const TextStyle(fontSize: 11)),
+                                  backgroundColor: Colors.white,
+                                  padding: EdgeInsets.zero,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                          if (diagnosisResult!['recommendedActions'] != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              locale.isFrench ? 'Actions Recommandées :' : 'Recommended Actions:',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            ...(diagnosisResult!['recommendedActions'] as List).map((a) {
+                              return Text('• $a', style: const TextStyle(fontSize: 12));
+                            }),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isAnalyzing ? null : () => Navigator.pop(ctx),
+              child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+            ),
+            ElevatedButton(
+              onPressed: isAnalyzing
+                  ? null
+                  : () async {
+                      setDlgState(() => isAnalyzing = true);
+                      try {
+                        final res = await auth.api.analyzePoultryWithGemini(
+                          deviceSerial: selectedDeviceSerial,
+                          imageBase64: selectedBase64,
+                          farmId: selectedFarmId,
+                          sensorData: _liveReadings,
+                        );
+
+                        if (res['success'] == true && res['diagnosis'] != null) {
+                          setDlgState(() {
+                            diagnosisResult = Map<String, dynamic>.from(res['diagnosis']);
+                            isAnalyzing = false;
+                          });
+                          _loadFarmerData();
+                        } else {
+                          setDlgState(() => isAnalyzing = false);
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text(res['message'] ?? 'Analysis failed'), backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        setDlgState(() => isAnalyzing = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D7A57),
+                foregroundColor: Colors.white,
+              ),
+              child: isAnalyzing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(locale.isFrench ? 'Analyser Maintenant' : 'Analyze Now'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAlertDetailsDialog(dynamic item) {
     final locale = Provider.of<LocaleProvider>(context, listen: false);
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -1980,6 +2254,79 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     child: Text(locale.isFrench ? 'Voir tout' : 'View All'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Gemini AI Vision & Behavior Diagnostics Card
+          Card(
+            elevation: 3,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xFF0D7A57), width: 1.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0D7A57), Color(0xFF1E88E5)],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              locale.isFrench
+                                  ? 'Diagnostic Avicole & Comportement Gemini IA'
+                                  : 'Gemini AI Poultry Vision & Behavior Diagnostics',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Text(
+                              locale.isFrench
+                                  ? 'Analyse multimodale par caméra ESP32-CAM & capteurs environnementaux'
+                                  : 'Multimodal vision analysis via ESP32-CAM & environmental sensors',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _showGeminiAnalysisDialog,
+                          icon: const Icon(Icons.camera_alt, size: 18),
+                          label: Text(
+                            locale.isFrench
+                                ? 'Lancer l\'Analyse Gemini IA'
+                                : 'Run Gemini AI Analysis',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D7A57),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

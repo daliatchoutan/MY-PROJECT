@@ -10,6 +10,7 @@ import '../../utils/product_helper.dart';
 import '../notifications_screen.dart';
 import '../profile_screen.dart';
 import '../welcome_screen.dart';
+import '../../widgets/leaflet_order_tracking_map.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -1392,6 +1393,21 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                               foregroundColor: Colors.red,
                               side: const BorderSide(color: Colors.red)),
                         ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          LeafletOrderTrackingModal.show(
+                            context,
+                            order: Map<String, dynamic>.from(o),
+                            delivery: o['delivery'] != null ? Map<String, dynamic>.from(o['delivery']) : null,
+                          );
+                        },
+                        icon: const Icon(Icons.map, size: 16),
+                        label: Text(locale.isFrench ? 'Suivre (Leaflet)' : 'Track (Leaflet)'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.shade700,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
                     ],
                   ),
                 ],

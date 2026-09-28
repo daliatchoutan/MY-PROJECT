@@ -589,4 +589,26 @@ class ApiService {
     );
     return await _processResponse(response);
   }
+
+  Future<Map<String, dynamic>> analyzePoultryWithGemini({
+    String? deviceSerial,
+    String? imageBase64,
+    String? imageUrl,
+    String? farmId,
+    Map<String, dynamic>? sensorData,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (deviceSerial != null) payload['deviceSerial'] = deviceSerial;
+    if (imageBase64 != null) payload['imageBase64'] = imageBase64;
+    if (imageUrl != null) payload['imageUrl'] = imageUrl;
+    if (farmId != null) payload['farmId'] = farmId;
+    if (sensorData != null) payload['sensorData'] = sensorData;
+
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/ai/analyze-poultry'),
+      headers: ApiConfig.headers(token),
+      body: jsonEncode(payload),
+    );
+    return await _processResponse(response);
+  }
 }

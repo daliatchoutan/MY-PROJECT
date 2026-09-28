@@ -66,7 +66,28 @@ const authorizeRoles = (...roles) => {
   };
 };
 
+const optionalVerifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_smart_poultry_farm_jwt_key_2026');
+    const user = await User.findByPk(decoded.id);
+    if (user && user.status !== 'suspended' && user.status !== 'blocked') {
+      req.user = decoded;
+      req.userModel = user;
+    }
+  } catch (e) {
+    // Ignore invalid token in optional mode
+  }
+  next();
+};
+
 module.exports = {
   verifyToken,
-  authorizeRoles
+  authorizeRoles,
+  optionalVerifyToken
 };

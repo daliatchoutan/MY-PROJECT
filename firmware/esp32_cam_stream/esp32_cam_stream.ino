@@ -13,6 +13,7 @@
 
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <Preferences.h>
@@ -57,11 +58,16 @@ Preferences preferences;
 
 const byte DNS_PORT = 53;
 const char* AP_SSID = "ESP32CAM-Setup";
-const char* BACKEND_TELEMETRY_URL = "http://192.168.1.100:5000/api/sensors/telemetry"; // Express Backend
+
+// Production Railway Backend Endpoints
+const char* BACKEND_TELEMETRY_URL = "https://my-project-production-f607.up.railway.app/api/sensors/telemetry";
+const char* BACKEND_AI_FRAME_URL = "https://my-project-production-f607.up.railway.app/api/ai/espcam-frame?deviceSerial=ESP32-CAM-01";
 
 bool isPortalMode = false;
 bool flashState = false;
 unsigned long lastTelemetryTime = 0;
+unsigned long lastAiInspectTime = 0;
+const unsigned long AI_INSPECT_INTERVAL = 300000; // 5 minutes between auto-AI inspections
 
 // ---------------------------------------------------------------------------
 // MJPEG Stream Handler
@@ -247,13 +253,16 @@ void handleResetWiFi() {
 }
 
 // ---------------------------------------------------------------------------
-// Send Camera IP Telemetry to Express Backend API
+// Send Camera IP Telemetry to Express Backend API (HTTPS)
 // ---------------------------------------------------------------------------
 void sendCameraTelemetryToBackend() {
   if (WiFi.status() != WL_CONNECTED || isPortalMode) return;
 
+  WiFiClientSecure client;
+  client.setInsecure(); // Bypass TLS cert validation on microcontroller
+
   HTTPClient http;
-  http.begin(BACKEND_TELEMETRY_URL);
+  http.begin(client, BACKEND_TELEMETRY_URL);
   http.addHeader("Content-Type", "application/json");
 
   String streamUrl = "http://" + WiFi.localIP().toString() + "/stream";
@@ -270,9 +279,41 @@ void sendCameraTelemetryToBackend() {
 
   int httpCode = http.POST(jsonString);
   if (httpCode > 0) {
-    Serial.printf("📡 ESP32-CAM Telemetry sent. Status: %d\n", httpCode);
+    Serial.printf("📡 ESP32-CAM Telemetry sent to Railway. Status: %d\n", httpCode);
   }
   http.end();
+}
+
+// ---------------------------------------------------------------------------
+// Capture and Upload Camera Frame for Gemini AI Health & Behavior Analysis
+// ---------------------------------------------------------------------------
+void sendFrameForAiAnalysis() {
+  if (WiFi.status() != WL_CONNECTED || isPortalMode) return;
+
+  Serial.println("\n[AI VISION] 📸 Capturing frame for Gemini Poultry Health Analysis...");
+  camera_fb_t * fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("[AI VISION] ⚠️ Frame capture failed!");
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  http.begin(client, BACKEND_AI_FRAME_URL);
+  http.addHeader("Content-Type", "image/jpeg");
+
+  int httpCode = http.POST(fb->buf, fb->len);
+  if (httpCode > 0) {
+    Serial.printf("✅ [AI VISION] Gemini inspection sent. HTTP: %d\n", httpCode);
+    String response = http.getString();
+    Serial.println("[AI VISION] Diagnosis response: " + response);
+  } else {
+    Serial.printf("❌ [AI VISION] Frame upload failed. Code: %d\n", httpCode);
+  }
+  http.end();
+  esp_camera_fb_return(fb);
 }
 
 // ---------------------------------------------------------------------------
@@ -388,8 +429,13 @@ void setup() {
     server.on("/snapshot", handleSnapshot);
     server.on("/flash", handleFlashToggle);
     server.on("/reset-wifi", handleResetWiFi);
+    server.on("/trigger-ai", []() {
+      sendFrameForAiAnalysis();
+      server.send(200, "application/json", "{\"status\":\"Gemini AI analysis triggered\"}");
+    });
 
     sendCameraTelemetryToBackend();
+    sendFrameForAiAnalysis(); // Run initial frame analysis upon boot
   }
 
   server.begin();
@@ -404,6 +450,12 @@ void loop() {
     if (millis() - lastTelemetryTime >= 30000) {
       sendCameraTelemetryToBackend();
       lastTelemetryTime = millis();
+    }
+
+    // Send automated Gemini AI flock health analysis every 5 minutes
+    if (millis() - lastAiInspectTime >= AI_INSPECT_INTERVAL) {
+      sendFrameForAiAnalysis();
+      lastAiInspectTime = millis();
     }
   }
   server.handleClient();
