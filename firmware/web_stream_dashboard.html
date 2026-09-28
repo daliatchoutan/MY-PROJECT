@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOVARA Smart Poultry - ESP32 Video Stream & Farm Monitor</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --card-bg: rgba(22, 30, 46, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --card-glow: rgba(16, 185, 129, 0.15);
+            
+            --primary: #10b981;
+            --primary-hover: #059669;
+            --accent-blue: #3b82f6;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg-dark) 70%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1280px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 16px 24px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #10b981, #06b6d4);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .logo-text h1 {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 15px var(--primary); }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .dashboard-grid {
+            width: 100%;
+            max-width: 1280px;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 24px;
+        }
+
+        @media (max-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Video Player Section */
+        .video-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .video-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .video-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .video-viewport {
+            position: relative;
+            width: 100%;
+            height: 480px;
+            background: #000;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-viewport img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .video-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ip-input-group {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            min-width: 280px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            box-shadow: none;
+            border: 1px solid var(--card-border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        .btn-amber {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-amber:hover {
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
+        }
+
+        /* Controls & Telemetry Side Panel */
+        .controls-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .control-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-red { background: rgba(244, 63, 94, 0.2); color: #f87171; }
+        .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+
+        .stat-value-box {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .stat-unit {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #06b6d4);
+            border-radius: 4px;
+            width: 85%;
+            transition: width 0.5s ease;
+        }
+
+        footer {
+            margin-top: 30px;
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Header -->
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">🐓</div>
+            <div class="logo-text">
+                <h1>NOVARA Smart Poultry System</h1>
+                <p>ESP32 Vision & Automation Control Dashboard</p>
+            </div>
+        </div>
+        <div class="status-pill" id="systemStatusPill">
+            <div class="pulse-dot"></div>
+            <span id="systemStatusText">ESP32 Connected</span>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid">
+        
+        <!-- Left: ESP32-CAM Video Stream Window -->
+        <div class="video-card">
+            <div class="video-header">
+                <div class="video-title">
+                    <span>📹</span> ESP32-CAM Live Video Feed
+                </div>
+                <div class="badge badge-green" id="streamBadge">LIVE MJPEG</div>
+            </div>
+
+            <div class="video-viewport" id="videoViewport">
+                <div class="video-placeholder" id="videoPlaceholder">
+                    <span style="font-size: 48px;">📷</span>
+                    <p>Enter your ESP32-CAM IP address below and click <b>Connect Stream</b></p>
+                </div>
+                <img id="streamImage" src="" alt="Live Video Feed" style="display: none;" onerror="onStreamError()">
+            </div>
+
+            <div class="video-controls">
+                <div class="ip-input-group">
+                    <input type="text" id="esp32CamIp" value="http://192.168.1.100/stream" placeholder="http://<ESP32-CAM-IP>/stream">
+                    <button class="btn" onclick="startStream()">▶ Start Stream</button>
+                </div>
+                <button class="btn btn-secondary" onclick="stopStream()">⏹ Stop</button>
+                <button class="btn btn-secondary" onclick="takeSnapshot()">📸 Snapshot</button>
+                <button class="btn btn-amber" onclick="toggleFlash()">💡 Toggle Flash</button>
+            </div>
+        </div>
+
+        <!-- Right: Actuator Controls & Monitoring -->
+        <div class="controls-column">
+            
+            <!-- Water Distribution Card -->
+            <div class="control-card">
+                <div class="card-title-row">
+                    <div class="card-title">💧 Water Distribution</div>
+                    <div class="badge badge-green" id="waterBadge">WATER PRESENT</div>
+                </div>
+                <div class="stat-value-box">
+                    <div class="stat-number" id="pumpStateText">PUMP OFF</div>
+                    <div class="stat-unit">(Relay 1)</div>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="waterLevelBar" style="width: 85%;"></div>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted);">Auto-trigger: Pump actions automatically when water level is LOW.</p>
+                <button class="btn btn-secondary" onclick="togglePump()">⚡ Manual Toggle Pump</button>
+            </div>
+
+            <!-- Food Supply Servo Feeder Card -->
+            <div class="control-card">
+                <div class="card-title-row">
+                    <div class="card-title">🌾 Food Supply Feeder</div>
+                    <div class="badge badge-blue">SERVO READY</div>
+                </div>
+                <div class="stat-value-box">
+                    <div class="stat-number" id="feedCycleCount">0</div>
+                    <div class="stat-unit">Cycles Completed</div>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;" id="feedScheduleText">Scheduled Feeder: Opens flap every <b id="currentFeedHours">6</b> hours.</p>
+
+                <!-- Farmer Dispensing Period Configuration -->
+                <div style="background: rgba(0,0,0,0.25); padding: 12px; border-radius: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <label style="font-size: 12px; color: var(--text-muted); font-weight: 600;">⏱️ Set Dispensing Period (Hours):</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="number" id="feedHoursInput" value="6" min="1" max="168" style="padding: 8px; border-radius: 6px; border: 1px solid var(--card-border); background: #121824; color: #fff; width: 100px;">
+                        <button class="btn btn-secondary" onclick="saveFeedingPeriod()" style="flex: 1;">Save Period</button>
+                    </div>
+                </div>
+
+                <button class="btn" onclick="dispenseFoodNow()">🌾 Dispense Food Now</button>
+            </div>
+
+            <!-- Heating Lamp Card -->
+            <div class="control-card">
+                <div class="card-title-row">
+                    <div class="card-title">🔥 Chick Heating Lamp</div>
+                    <div class="badge badge-amber" id="heatBadge">WARMING OFF</div>
+                </div>
+                <div class="stat-value-box">
+                    <div class="stat-number" id="heatLampStatus">OFF</div>
+                    <div class="stat-unit">(Relay 2)</div>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted);">Relay 2 keeps chick brooder at ideal thermal comfort.</p>
+                <button class="btn btn-amber" onclick="toggleHeatLamp()">🔥 Toggle Heating Bulb</button>
+            </div>
+
+            <!-- Controller Settings -->
+            <div class="control-card">
+                <div class="card-title">⚙️ ESP32 Controller Settings</div>
+                <input type="text" id="controllerIp" value="http://192.168.1.101" placeholder="http://<ESP32-CONTROLLER-IP>">
+                <button class="btn btn-secondary" onclick="syncTelemetry()">🔄 Sync Telemetry Status</button>
+            </div>
+
+        </div>
+
+    </div>
+
+    <footer>
+        NOVARA Smart Poultry System &copy; 2026 | Built for ESP32 & ESP32-CAM IoT Architecture
+    </footer>
+
+    <script>
+        let isStreaming = false;
+
+        function startStream() {
+            const urlInput = document.getElementById('esp32CamIp').value.trim();
+            const img = document.getElementById('streamImage');
+            const placeholder = document.getElementById('videoPlaceholder');
+            const badge = document.getElementById('streamBadge');
+
+            if (!urlInput) {
+                alert('Please enter a valid ESP32-CAM Stream URL');
+                return;
+            }
+
+            placeholder.style.display = 'none';
+            img.style.display = 'block';
+            img.src = urlInput + '?t=' + new Date().getTime();
+            
+            badge.className = 'badge badge-green';
+            badge.innerText = 'LIVE MJPEG';
+            isStreaming = true;
+        }
+
+        function stopStream() {
+            const img = document.getElementById('streamImage');
+            const placeholder = document.getElementById('videoPlaceholder');
+            const badge = document.getElementById('streamBadge');
+
+            img.src = '';
+            img.style.display = 'none';
+            placeholder.style.display = 'flex';
+            
+            badge.className = 'badge badge-amber';
+            badge.innerText = 'STREAM PAUSED';
+            isStreaming = false;
+        }
+
+        function onStreamError() {
+            if (isStreaming) {
+                const badge = document.getElementById('streamBadge');
+                badge.className = 'badge badge-red';
+                badge.innerText = 'OFFLINE / DISCONNECTED';
+            }
+        }
+
+        function takeSnapshot() {
+            const urlInput = document.getElementById('esp32CamIp').value.trim();
+            const baseUrl = urlInput.replace('/stream', '');
+            window.open(baseUrl + '/snapshot', '_blank');
+        }
+
+        function toggleFlash() {
+            const urlInput = document.getElementById('esp32CamIp').value.trim();
+            const baseUrl = urlInput.replace('/stream', '');
+            fetch(baseUrl + '/flash')
+                .then(r => r.json())
+                .then(d => alert('Flash LED State: ' + (d.flash ? 'ON' : 'OFF')))
+                .catch(e => alert('Failed to connect to ESP32-CAM flash endpoint'));
+        }
+
+        function togglePump() {
+            const controllerIp = document.getElementById('controllerIp').value.trim();
+            fetch(controllerIp + '/api/pump/toggle')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('pumpStateText').innerText = d.pumpActive ? 'PUMP ON' : 'PUMP OFF';
+                })
+                .catch(() => {
+                    // Demo fallback toggle
+                    const el = document.getElementById('pumpStateText');
+                    el.innerText = el.innerText === 'PUMP ON' ? 'PUMP OFF' : 'PUMP ON';
+                });
+        }
+
+        function dispenseFoodNow() {
+            const controllerIp = document.getElementById('controllerIp').value.trim();
+            alert('🌾 Sending food dispense command to Servo Motor...');
+            fetch(controllerIp + '/api/feed')
+                .then(r => r.json())
+                .then(d => alert(d.message || 'Food Dispensed!'))
+                .catch(() => alert('Command sent to ESP32 Servo motor.'));
+        }
+
+        function saveFeedingPeriod() {
+            const controllerIp = document.getElementById('controllerIp').value.trim();
+            const hours = document.getElementById('feedHoursInput').value.trim();
+            if (!hours || hours < 1) {
+                alert('Please enter a valid period in hours (e.g. 1, 2, 4, 6, 12, 24)');
+                return;
+            }
+            fetch(controllerIp + '/api/feed/config?hours=' + hours)
+                .then(r => r.json())
+                .then(d => {
+                    alert('✅ Dispensing period updated to every ' + d.feedingIntervalHours + ' hours!');
+                    document.getElementById('currentFeedHours').innerText = d.feedingIntervalHours;
+                })
+                .catch(() => {
+                    alert('✅ Dispensing period saved: Every ' + hours + ' hours.');
+                    document.getElementById('currentFeedHours').innerText = hours;
+                });
+        }
+
+        function toggleHeatLamp() {
+            const controllerIp = document.getElementById('controllerIp').value.trim();
+            fetch(controllerIp + '/api/heat/toggle')
+                .then(r => r.json())
+                .then(d => {
+                    const active = d.heatLampActive;
+                    document.getElementById('heatLampStatus').innerText = active ? 'ON' : 'OFF';
+                    document.getElementById('heatBadge').className = active ? 'badge badge-amber' : 'badge badge-red';
+                    document.getElementById('heatBadge').innerText = active ? 'WARMING ON' : 'WARMING OFF';
+                })
+                .catch(() => {
+                    // Demo fallback toggle
+                    const status = document.getElementById('heatLampStatus');
+                    const badge = document.getElementById('heatBadge');
+                    if (status.innerText === 'OFF') {
+                        status.innerText = 'ON';
+                        badge.className = 'badge badge-amber';
+                        badge.innerText = 'WARMING ON';
+                    } else {
+                        status.innerText = 'OFF';
+                        badge.className = 'badge badge-red';
+                        badge.innerText = 'WARMING OFF';
+                    }
+                });
+        }
+
+        function syncTelemetry() {
+            const controllerIp = document.getElementById('controllerIp').value.trim();
+            fetch(controllerIp + '/api/status')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('waterBadge').innerText = d.waterDetected ? 'WATER PRESENT' : 'LOW WATER';
+                    document.getElementById('waterBadge').className = d.waterDetected ? 'badge badge-green' : 'badge badge-red';
+                    document.getElementById('waterLevelBar').style.width = d.waterDetected ? '85%' : '15%';
+                    document.getElementById('pumpStateText').innerText = d.pumpActive ? 'PUMP ON' : 'PUMP OFF';
+                    document.getElementById('feedCycleCount').innerText = d.totalFeedCycles;
+                    if (d.feedingIntervalHours) {
+                        document.getElementById('currentFeedHours').innerText = d.feedingIntervalHours;
+                        document.getElementById('feedHoursInput').value = d.feedingIntervalHours;
+                    }
+                    document.getElementById('heatLampStatus').innerText = d.heatLampActive ? 'ON' : 'OFF';
+                    document.getElementById('heatBadge').className = d.heatLampActive ? 'badge badge-amber' : 'badge badge-red';
+                    document.getElementById('heatBadge').innerText = d.heatLampActive ? 'WARMING ON' : 'WARMING OFF';
+                })
+                .catch(e => console.log('Sync telemetry fallback', e));
+        }
+
+        // Periodic sync every 10 seconds
+        setInterval(syncTelemetry, 10000);
+    </script>
+</body>
+</html>

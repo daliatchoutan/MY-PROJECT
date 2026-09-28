@@ -1,9 +1,9 @@
 const { SensorReading, Device, Farm, Notification } = require('../models');
+const { getPendingCommands } = require('../utils/iotCommandQueue');
 
 const ingestTelemetry = async (req, res, next) => {
   try {
     const { 
-      deviceSerial, 
       type,
       foodLevel, 
       waterLevel: rawWaterLevel, 
@@ -17,8 +17,10 @@ const ingestTelemetry = async (req, res, next) => {
       humidity 
     } = req.body;
 
+    const deviceSerial = req.body.deviceSerial || req.body.deviceId;
+
     if (!deviceSerial) {
-      return res.status(400).json({ message: 'deviceSerial is required.' });
+      return res.status(400).json({ message: 'deviceSerial or deviceId is required.' });
     }
 
     // Auto-compute numeric water level if boolean waterDetected is sent
@@ -103,12 +105,19 @@ const ingestTelemetry = async (req, res, next) => {
       }
     }
 
+    // Fetch any pending actuator commands queued for this device
+    const pendingCommands = [
+      ...getPendingCommands(deviceSerial, true),
+      ...(device.id && device.id !== deviceSerial ? getPendingCommands(device.id, true) : [])
+    ];
+
     return res.status(201).json({
       message: 'Telemetry ingested successfully',
       deviceSerial,
       reading,
       streamUrl: streamUrl || null,
-      automationTriggers
+      automationTriggers,
+      commands: pendingCommands
     });
   } catch (error) {
     next(error);
@@ -147,8 +156,28 @@ const getReadingHistory = async (req, res, next) => {
   }
 };
 
+const getPendingCommandsForDevice = async (req, res, next) => {
+  try {
+    const deviceIdentifier = req.query.deviceSerial || req.query.deviceId || req.params.deviceSerial;
+    if (!deviceIdentifier) {
+      return res.status(400).json({ message: 'deviceSerial or deviceId parameter is required' });
+    }
+    const consume = req.query.consume !== 'false';
+    const commands = getPendingCommands(deviceIdentifier, consume);
+    return res.json({
+      deviceSerial: deviceIdentifier,
+      commands,
+      count: commands.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   ingestTelemetry,
   getLiveReadings,
-  getReadingHistory
+  getReadingHistory,
+  getPendingCommandsForDevice
 };

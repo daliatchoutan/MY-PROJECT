@@ -1,4 +1,5 @@
 const { Device, Farm, SensorReading, Notification } = require('../models');
+const { enqueueCommand, getPendingCommands } = require('../utils/iotCommandQueue');
 
 const registerDevice = async (req, res, next) => {
   try {
@@ -103,7 +104,7 @@ const toggleAutoMode = async (req, res, next) => {
 
 const manualOverride = async (req, res, next) => {
   try {
-    const { action } = req.body; // 'FEEDER_ON', 'WATER_VALVE_ON', 'FAN_ON', 'HEATER_ON'
+    const { action, params } = req.body;
     const device = await Device.findByPk(req.params.id, {
       include: [{ model: Farm, as: 'farm' }]
     });
@@ -112,24 +113,51 @@ const manualOverride = async (req, res, next) => {
       return res.status(404).json({ message: 'Device not found.' });
     }
 
-    const validActions = ['FEEDER_ON', 'WATER_VALVE_ON', 'FAN_ON', 'HEATER_ON'];
+    const validActions = [
+      'FEEDER_ON', 'FEED',
+      'WATER_VALVE_ON', 'WATER_VALVE_OFF',
+      'PUMP_ON', 'PUMP_OFF',
+      'FAN_ON', 'FAN_OFF',
+      'HEATER_ON', 'HEATER_OFF'
+    ];
     if (!validActions.includes(action)) {
       return res.status(400).json({ message: `Invalid override action '${action}'. Valid actions: ${validActions.join(', ')}` });
     }
 
-    await Notification.create({
-      userId: device.farm.farmerId,
-      title: `Manual Actuator Override: ${action}`,
-      message: `Manual override triggered for device '${device.name}' (${action}).`,
-      type: 'environmental_alert'
-    });
+    // Enqueue command in IoT queue for the ESP32 to fetch
+    const queuedCmd = enqueueCommand(device.deviceSerial, action, params);
+    if (device.id !== device.deviceSerial) {
+      enqueueCommand(device.id, action, params);
+    }
+
+    if (device.farm) {
+      await Notification.create({
+        userId: device.farm.farmerId,
+        title: `Manual Actuator Override: ${action}`,
+        message: `Manual override triggered for device '${device.name}' (${action}).`,
+        type: 'environmental_alert'
+      });
+    }
 
     return res.json({
-      message: `Manual actuator command '${action}' executed successfully on device '${device.name}'.`,
+      message: `Manual actuator command '${action}' enqueued and sent to device '${device.name}'.`,
       action,
       deviceId: device.id,
+      deviceSerial: device.deviceSerial,
+      commandId: queuedCmd ? queuedCmd.id : null,
       timestamp: new Date().toISOString()
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPendingCommandsForDevice = async (req, res, next) => {
+  try {
+    const deviceIdentifier = req.params.id;
+    const consume = req.query.consume !== 'false';
+    const commands = getPendingCommands(deviceIdentifier, consume);
+    return res.json({ deviceIdentifier, commands, count: commands.length });
   } catch (error) {
     next(error);
   }
@@ -155,5 +183,6 @@ module.exports = {
   updateDeviceThresholds,
   toggleAutoMode,
   manualOverride,
+  getPendingCommandsForDevice,
   deleteDevice
 };

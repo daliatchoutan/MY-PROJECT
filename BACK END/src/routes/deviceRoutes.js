@@ -10,6 +10,7 @@ router.get('/', authorizeRoles('Farmer', 'Administrator'), deviceController.getD
 router.put('/:id', authorizeRoles('Farmer', 'Administrator'), deviceController.updateDeviceThresholds);
 router.put('/:id/mode', authorizeRoles('Farmer', 'Administrator'), deviceController.toggleAutoMode);
 router.post('/:id/override', authorizeRoles('Farmer', 'Administrator'), deviceController.manualOverride);
+router.get('/:id/commands', authorizeRoles('Farmer', 'Administrator'), deviceController.getPendingCommandsForDevice);
 router.delete('/:id', authorizeRoles('Farmer', 'Administrator'), deviceController.deleteDevice);
 
 module.exports = router;
