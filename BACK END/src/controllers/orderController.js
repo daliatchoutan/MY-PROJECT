@@ -180,6 +180,13 @@ const initiatePayment = async (req, res, next) => {
       attributes: ['id', 'name', 'email', 'phone']
     });
 
+    const targetPhone = phone || customer?.phone;
+    if (!targetPhone || !targetPhone.toString().trim()) {
+      return res.status(400).json({
+        message: 'A valid customer phone number is required to initiate Mobile Money payment.'
+      });
+    }
+
     if (digiPayService.isConfigured()) {
       const sessionResult = await digiPayService.createPaymentSession({
         order,

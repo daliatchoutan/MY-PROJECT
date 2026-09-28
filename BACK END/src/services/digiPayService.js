@@ -30,9 +30,23 @@ const isConfigured = () => {
  * E.g., "+237 671 234 567" -> "237671234567"
  * E.g., "671234567" -> "237671234567"
  */
+/**
+ * Normalizes phone numbers to standard Cameroon format: 237XXXXXXXXX (digits only).
+ * Handles +237, 00237, leading zero, local 9-digit, spaces, and dashes.
+ * E.g., "+237 671 234 567" -> "237671234567"
+ * E.g., "671234567"        -> "237671234567"
+ * E.g., "00237671234567"   -> "237671234567"
+ * E.g., "0671234567"       -> "237671234567"
+ */
 const formatPhone = (phone) => {
   if (!phone) return '';
   const digits = phone.toString().replace(/\D/g, '');
+  if (digits.length >= 9) {
+    const last9 = digits.slice(-9);
+    if (last9.startsWith('6') || last9.startsWith('2')) {
+      return `237${last9}`;
+    }
+  }
   if (digits.startsWith('237') && digits.length === 12) return digits;
   if (digits.length === 9) return `237${digits}`;
   return digits;
@@ -61,17 +75,26 @@ const createPaymentSession = async ({ order, customer, phone, paymentMethod, web
     return {
       success: false,
       configured: false,
-      message: 'DigiPay API key is not configured in environment variables. Please add DIGIPAY_API_KEY to .env.',
+      message: 'Payment gateway API key is not configured in environment variables.',
       paymentUrl: null,
       paymentReference: `LOCAL-${order.id}`
     };
   }
 
   const customerPhone = formatPhone(phone || customer?.phone);
+  if (!customerPhone) {
+    return {
+      success: false,
+      configured: true,
+      message: 'A valid customer Mobile Money phone number is required to initiate payment.',
+      paymentUrl: null,
+      paymentReference: null
+    };
+  }
 
   const payload = {
     amount: Math.round(parseFloat(order.totalAmount)),
-    customerPhone: customerPhone || '237699000000',
+    customerPhone,
     customerEmail: customer?.email || 'customer@novara.app',
     metadata: {
       orderId: order.id,

@@ -542,7 +542,22 @@ class _CustomerDashboardState extends State<CustomerDashboard>
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final userPhone = auth.user?['phone']?.toString() ?? '';
     final phoneCtrl = TextEditingController(text: userPhone);
-    String selectedMethod = 'MTN Mobile Money';
+
+    String detectChannel(String text) {
+      final digits = text.replaceAll(RegExp(r'\D'), '');
+      final last9 = digits.length >= 9 ? digits.substring(digits.length - 9) : digits;
+      if (last9.startsWith('69') ||
+          last9.startsWith('655') ||
+          last9.startsWith('656') ||
+          last9.startsWith('657') ||
+          last9.startsWith('658') ||
+          last9.startsWith('659')) {
+        return 'Orange Money';
+      }
+      return 'MTN Mobile Money';
+    }
+
+    String selectedMethod = userPhone.isNotEmpty ? detectChannel(userPhone) : 'MTN Mobile Money';
     bool isProcessing = false;
     final locale = Provider.of<LocaleProvider>(context, listen: false);
 
@@ -556,7 +571,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  locale.isFrench ? 'Paiement DigiPay' : 'DigiPay Checkout',
+                  locale.isFrench ? 'Paiement Sécurisé' : 'Secure Checkout',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -578,7 +593,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                     const Icon(Icons.verified_user, color: Color(0xFF0D7A57), size: 16),
                     const SizedBox(width: 6),
                     Text(
-                      'DigiPay Mobile Money Gateway',
+                      locale.isFrench ? 'Paiement Mobile Money Sécurisé' : 'Secure Mobile Money Payment',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Colors.green.shade900,
@@ -595,7 +610,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                initialValue: selectedMethod,
+                value: selectedMethod,
                 decoration: InputDecoration(
                   labelText: locale.isFrench ? 'Canal de paiement' : 'Payment Channel',
                   border: const OutlineInputBorder(),
@@ -609,9 +624,18 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               TextField(
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
+                onChanged: (val) {
+                  final detected = detectChannel(val);
+                  if (detected != selectedMethod) {
+                    setDialogState(() => selectedMethod = detected);
+                  }
+                },
                 decoration: InputDecoration(
                   labelText: locale.isFrench ? 'Numéro Mobile Money (Push USSD)' : 'Phone for Mobile Money Push',
-                  hintText: 'Ex: 237 6XX XXX XXX',
+                  hintText: 'Ex: 6XX XXX XXX ou +237 6XX...',
+                  helperText: locale.isFrench
+                      ? 'Un prompt de validation USSD sera envoyé sur ce numéro'
+                      : 'A USSD confirmation prompt will be sent to this number',
                   prefixIcon: const Icon(Icons.phone_android, color: Color(0xFF0D7A57)),
                   border: const OutlineInputBorder(),
                 ),
@@ -626,6 +650,22 @@ class _CustomerDashboardState extends State<CustomerDashboard>
             ElevatedButton(
               onPressed: isProcessing ? null : () async {
                 final inputPhone = phoneCtrl.text.trim();
+                final digitsOnly = inputPhone.replaceAll(RegExp(r'\D'), '');
+
+                if (digitsOnly.length < 9) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        locale.isFrench
+                            ? 'Veuillez saisir un numéro de téléphone valide (ex: 6XX XXX XXX).'
+                            : 'Please enter a valid phone number (e.g. 6XX XXX XXX).',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
                 setDialogState(() => isProcessing = true);
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
                 try {
@@ -652,8 +692,8 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                       SnackBar(
                         content: Text(
                           locale.isFrench
-                              ? 'Session DigiPay enregistrée ($ref). En attente de DIGIPAY_API_KEY dans le .env backend.'
-                              : 'DigiPay session registered ($ref). Awaiting DIGIPAY_API_KEY in backend .env.',
+                              ? 'Session de paiement enregistrée ($ref). En attente de configuration passerelle.'
+                              : 'Payment session registered ($ref). Awaiting gateway configuration.',
                         ),
                         backgroundColor: const Color(0xFFE67E22),
                       ),
@@ -664,8 +704,8 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                         content: Text(
                           res['message'] ??
                               (locale.isFrench
-                                  ? 'Session DigiPay créée avec succès !'
-                                  : 'DigiPay session created successfully!'),
+                                  ? 'Demande de paiement envoyée avec succès !'
+                                  : 'Payment request submitted successfully!'),
                         ),
                         backgroundColor: const Color(0xFF0D7A57),
                       ),
@@ -713,7 +753,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  locale.isFrench ? 'Notification Push DigiPay' : 'DigiPay Push Notification',
+                  locale.isFrench ? 'Validation Mobile Money' : 'Mobile Money Verification',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -725,9 +765,32 @@ class _CustomerDashboardState extends State<CustomerDashboard>
             children: [
               Text(
                 locale.isFrench
-                    ? 'Une notification de paiement Mobile Money a été envoyée sur votre téléphone ${phone != null && phone.isNotEmpty ? "($phone)" : ""}.\nVeuillez consulter votre téléphone et entrer votre code secret Mobile Money pour approuver.'
-                    : 'A Mobile Money push request has been sent to your phone ${phone != null && phone.isNotEmpty ? "($phone)" : ""}.\nPlease check your phone and enter your Mobile Money PIN to approve the transaction.',
+                    ? 'Une demande de paiement Mobile Money a été envoyée sur votre téléphone ${phone != null && phone.isNotEmpty ? "($phone)" : ""}.\nVeuillez composer votre code secret Mobile Money pour approuver.'
+                    : 'A Mobile Money push request has been sent to your phone ${phone != null && phone.isNotEmpty ? "($phone)" : ""}.\nPlease enter your Mobile Money secret PIN to approve.',
                 style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.orange.shade800),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        locale.isFrench
+                            ? 'Orange Money : Si aucun prompt n\'apparaît, composez #150*50# pour valider.'
+                            : 'Orange Money: If no prompt appears, dial #150*50# to approve.',
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               Text(
@@ -763,12 +826,12 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                             content: Text(
                               isPaid
                                   ? (locale.isFrench
-                                      ? 'Paiement DigiPay confirmé avec succès !'
-                                      : 'DigiPay payment confirmed successfully!')
+                                      ? 'Paiement confirmé avec succès !'
+                                      : 'Payment confirmed successfully!')
                                   : (res['message'] ??
                                       (locale.isFrench
-                                          ? 'Paiement toujours en attente chez DigiPay'
-                                          : 'Payment still pending with DigiPay')),
+                                          ? 'Paiement en attente de validation sur votre téléphone'
+                                          : 'Payment still pending authorization on your phone')),
                             ),
                             backgroundColor: isPaid ? Colors.green : const Color(0xFFE67E22),
                           ),
@@ -814,11 +877,11 @@ class _CustomerDashboardState extends State<CustomerDashboard>
         SnackBar(
           content: Text(
             isPaid
-                ? (locale.isFrench ? 'Paiement DigiPay vérifié et confirmé !' : 'DigiPay payment verified and confirmed!')
+                ? (locale.isFrench ? 'Paiement vérifié et confirmé !' : 'Payment verified and confirmed!')
                 : (res['message'] ??
                     (locale.isFrench
-                        ? 'Statut DigiPay : En cours de traitement'
-                        : 'DigiPay status: Pending verification')),
+                        ? 'Statut du paiement : En attente de validation'
+                        : 'Payment status: Pending verification')),
           ),
           backgroundColor: isPaid ? Colors.green : const Color(0xFFE67E22),
         ),
@@ -1304,7 +1367,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                           OutlinedButton.icon(
                             onPressed: () => _verifyOrderPayment(o['id']),
                             icon: const Icon(Icons.verified_outlined, size: 16),
-                            label: Text(locale.isFrench ? 'Vérifier DigiPay' : 'Verify DigiPay'),
+                            label: Text(locale.isFrench ? 'Vérifier paiement' : 'Verify Payment'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF0D7A57),
                               side: const BorderSide(color: Color(0xFF0D7A57)),

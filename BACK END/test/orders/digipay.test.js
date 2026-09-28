@@ -22,6 +22,8 @@ describe('DigiPay Payment Integration Tests', () => {
       assert.strictEqual(digiPayService.formatPhone('+237 671 234 567'), '237671234567');
       assert.strictEqual(digiPayService.formatPhone('699000000'), '237699000000');
       assert.strictEqual(digiPayService.formatPhone('237699000000'), '237699000000');
+      assert.strictEqual(digiPayService.formatPhone('00237671234567'), '237671234567');
+      assert.strictEqual(digiPayService.formatPhone('0671234567'), '237671234567');
     });
 
     it('should use digitalcertify.tech base URL by default', () => {
@@ -112,6 +114,30 @@ describe('DigiPay Payment Integration Tests', () => {
       await orderController.initiatePayment(req, res, next);
       assert.strictEqual(res.statusCode, 403);
       assert.strictEqual(res.data.message, 'Forbidden. You do not own this order.');
+    });
+
+    it('should return 400 if phone number is missing', async () => {
+      const fakeOrder = {
+        id: 'ord-phone-test',
+        customerId: 'cust-1',
+        totalAmount: 15000,
+        currency: 'FCFA',
+        save: sinon.stub().resolves()
+      };
+      sinon.stub(Order, 'findByPk').resolves(fakeOrder);
+      sinon.stub(User, 'findByPk').resolves({ id: 'cust-1', name: 'John Doe', email: 'john@example.com', phone: null });
+
+      const req = createMockReq({
+        params: { id: 'ord-phone-test' },
+        user: { id: 'cust-1', role: 'Customer' },
+        body: { paymentMethod: 'MTN Mobile Money' } // no phone provided
+      });
+      const res = createMockRes();
+      const next = createMockNext();
+
+      await orderController.initiatePayment(req, res, next);
+      assert.strictEqual(res.statusCode, 400);
+      assert.strictEqual(res.data.message, 'A valid customer phone number is required to initiate Mobile Money payment.');
     });
 
     it('should initiate session with DigiPay when service is configured', async () => {
