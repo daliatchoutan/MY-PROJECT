@@ -15,7 +15,8 @@
     "test:deliveries": "mocha test/deliveries/delivery.test.js --no-config --exit",
     "test:users": "mocha test/users/user.test.js --no-config --exit",
     "sync:web": "node -e \"const fs=require('fs'); if(fs.existsSync('../FRONT END/build/web')){ fs.cpSync('../FRONT END/build/web', './public', {recursive:true}); console.log('Web artifacts synced to public/'); }\"",
-    "build:web": "npm run sync:web"
+    "build:web": "npm run sync:web",
+    "build": "echo 'Prebuilt Flutter Web assets ready in public/'"
   },
   "keywords": [],
   "author": "",
