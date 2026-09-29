@@ -1785,19 +1785,41 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
               _loadFarmerData();
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: locale.isFrench ? 'Actualiser' : 'Refresh Dashboard',
-            onPressed: _loadFarmerData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              auth.logout();
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-              );
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More Options',
+            onSelected: (val) {
+              if (val == 'refresh') {
+                _loadFarmerData();
+              } else if (val == 'logout') {
+                auth.logout();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                );
+              }
             },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    const Icon(Icons.refresh, size: 18, color: Colors.blueGrey),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Actualiser' : 'Refresh'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout, size: 18, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Déconnexion' : 'Logout'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
         bottom: TabBar(

@@ -174,12 +174,18 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
     return Scaffold(
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
-              child: Image.asset('assets/images/novara_logo.jpg', width: 30, height: 30, fit: BoxFit.cover),
+              child: Image.asset('assets/images/novara_logo.jpg', width: 28, height: 28, fit: BoxFit.cover),
             ),
             const SizedBox(width: 8),
-            Text(locale.tr('role_admin')),
+            Flexible(
+              child: Text(
+                locale.tr('role_admin'),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         backgroundColor: const Color(0xFF1E293B),
@@ -200,21 +206,48 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
               MaterialPageRoute(builder: (_) => const ProfileScreen()),
             ),
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAdminData),
           IconButton(
             icon: const Icon(Icons.notifications),
+            tooltip: 'Notifications',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              auth.logout();
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-              );
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More Options',
+            onSelected: (val) {
+              if (val == 'refresh') {
+                _loadAdminData();
+              } else if (val == 'logout') {
+                auth.logout();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                );
+              }
             },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    const Icon(Icons.refresh, size: 18, color: Colors.blueGrey),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Actualiser' : 'Refresh'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout, size: 18, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Déconnexion' : 'Logout'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
         bottom: TabBar(

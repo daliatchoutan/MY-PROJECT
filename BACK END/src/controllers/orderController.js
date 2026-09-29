@@ -162,7 +162,7 @@ const createOrder = async (req, res, next) => {
 
 const initiatePayment = async (req, res, next) => {
   try {
-    const { paymentMethod, phone, successUrl, failureUrl } = req.body;
+    const { paymentMethod, phone, customerPhone, phoneNumber, successUrl, failureUrl } = req.body;
     const order = await Order.findByPk(req.params.id);
 
     if (!order) {
@@ -180,7 +180,8 @@ const initiatePayment = async (req, res, next) => {
       attributes: ['id', 'name', 'email', 'phone']
     });
 
-    const targetPhone = phone || customer?.phone;
+    const enteredPhone = (phone || customerPhone || phoneNumber || '').toString().trim();
+    const targetPhone = enteredPhone || customer?.phone;
     if (!targetPhone || !targetPhone.toString().trim()) {
       return res.status(400).json({
         message: 'A valid customer phone number is required to initiate Mobile Money payment.'
@@ -191,7 +192,7 @@ const initiatePayment = async (req, res, next) => {
       const sessionResult = await digiPayService.createPaymentSession({
         order,
         customer,
-        phone,
+        phone: targetPhone,
         paymentMethod: order.paymentMethod,
         successUrl,
         failureUrl

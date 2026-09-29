@@ -81,7 +81,8 @@ const createPaymentSession = async ({ order, customer, phone, paymentMethod, web
     };
   }
 
-  const customerPhone = formatPhone(phone || customer?.phone);
+  const rawPhone = (phone || customer?.phone || '').toString().trim();
+  const customerPhone = formatPhone(rawPhone);
   if (!customerPhone) {
     return {
       success: false,
@@ -92,14 +93,48 @@ const createPaymentSession = async ({ order, customer, phone, paymentMethod, web
     };
   }
 
+  const last9 = customerPhone.slice(-9);
+  const methodStr = (paymentMethod || '').toLowerCase();
+  const isOrange = methodStr.includes('orange') ||
+    last9.startsWith('69') ||
+    ['655', '656', '657', '658', '659'].some(p => last9.startsWith(p));
+  const operator = isOrange ? 'ORANGE' : 'MTN';
+  const channel = isOrange ? 'ORANGE_MONEY' : 'MTN_MOMO';
+  const resolvedMethod = isOrange ? 'Orange Money' : 'MTN Mobile Money';
+
   const payload = {
     amount: Math.round(parseFloat(order.totalAmount)),
+    currency: 'XAF',
+    // Customer phone in all standard gateway parameter formats:
     customerPhone,
+    phone: customerPhone,
+    phoneNumber: customerPhone,
+    msisdn: customerPhone,
+    payerPhone: customerPhone,
+    localPhone: last9,
+    formattedPhone: `+${customerPhone}`,
+
+    // Routing and Channel:
+    operator,
+    channel,
+    paymentMethod: resolvedMethod,
+    description: `NOVARA Order #${order.id.toString().substring(0, 8)}`,
+    orderId: order.id,
+
+    // Customer Identity:
     customerEmail: customer?.email || 'customer@novara.app',
+    customerName: customer?.name || 'Novara Customer',
+
     metadata: {
       orderId: order.id,
-      paymentMethod: paymentMethod || 'MTN Mobile Money',
-      customerName: customer?.name || 'Novara Customer'
+      customerPhone,
+      enteredPhone: rawPhone,
+      localPhone: last9,
+      operator,
+      channel,
+      paymentMethod: resolvedMethod,
+      customerName: customer?.name || 'Novara Customer',
+      customerEmail: customer?.email || 'customer@novara.app'
     }
   };
 
@@ -113,6 +148,7 @@ const createPaymentSession = async ({ order, customer, phone, paymentMethod, web
   }
 
   try {
+    console.log(`[DigiPay] Initiating pay-in for Order ${order.id}: amount=${payload.amount} XAF, phone=${customerPhone} (${operator}), method=${resolvedMethod}`);
     const endpoint = `${baseUrl}/payments/initiate`;
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -124,6 +160,7 @@ const createPaymentSession = async ({ order, customer, phone, paymentMethod, web
     });
 
     const data = await response.json().catch(() => ({}));
+    console.log(`[DigiPay] Initiate response (HTTP ${response.status}):`, JSON.stringify(data));
 
     if (!response.ok) {
       const errMsg = data.message || data.error || `DigiPay API error (HTTP ${response.status})`;

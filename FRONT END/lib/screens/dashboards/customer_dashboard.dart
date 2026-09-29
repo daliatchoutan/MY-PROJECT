@@ -772,23 +772,31 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               ),
               const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.orange.shade200),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.orange.shade800),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        locale.isFrench
-                            ? 'Orange Money : Si aucun prompt n\'apparaît, composez #150*50# pour valider.'
-                            : 'Orange Money: If no prompt appears, dial #150*50# to approve.',
-                        style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
-                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Colors.orange.shade900),
+                        const SizedBox(width: 6),
+                        Text(
+                          locale.isFrench ? 'Codes d\'approbation manuelle :' : 'Manual Approval Codes:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange.shade900),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      locale.isFrench
+                          ? '• MTN MoMo : composez *126# si le push ne s\'affiche pas\n• Orange Money : composez #150*50#'
+                          : '• MTN MoMo: dial *126# if prompt does not appear\n• Orange Money: dial #150*50#',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade900, height: 1.3),
                     ),
                   ],
                 ),
@@ -995,6 +1003,176 @@ class _CustomerDashboardState extends State<CustomerDashboard>
     );
   }
 
+  void _showOrderDetailsDialog(dynamic o) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+    final items = (o['items'] as List<dynamic>?) ?? [];
+    final delivery = o['delivery'];
+    final driver = delivery?['deliveryPerson'];
+    final payStatus = (o['paymentStatus'] ?? 'pending').toString().toLowerCase();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.receipt_long, color: Color(0xFF0D7A57)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Order #${o['id'].toString().substring(0, 8)}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${locale.tr('total')}: ${o['totalAmount']} FCFA',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0D7A57)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: payStatus == 'paid' ? Colors.green.shade50 : Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: payStatus == 'paid' ? Colors.green : Colors.amber),
+                      ),
+                      child: Text(
+                        payStatus.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: payStatus == 'paid' ? Colors.green.shade900 : Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (o['createdAt'] != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '${locale.isFrench ? "Date" : "Date"}: ${o['createdAt'].toString().replaceFirst('T', ' ').substring(0, 19)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+                if (o['shippingAddress'] != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${o['shippingAddress']}',
+                          style: const TextStyle(fontSize: 13, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (o['paymentReference'] != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ref: ${o['paymentReference']}',
+                    style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
+                  ),
+                ],
+                if (driver != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.purple.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delivery_dining, color: Colors.purple, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${locale.isFrench ? "Livreur" : "Courier"}: ${driver['name'] ?? ''} (${driver['phone'] ?? ''})',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.purple),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const Divider(height: 20),
+                Text(
+                  locale.isFrench ? 'Articles commandés :' : 'Ordered Items:',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                if (items.isEmpty)
+                  Text(
+                    locale.isFrench ? 'Détails des articles non disponibles.' : 'No item details available.',
+                    style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                  )
+                else
+                  ...items.map((it) {
+                    final pName = it['product']?['name'] ?? 'Product';
+                    final qty = it['quantity'] ?? 1;
+                    final price = it['unitPrice'] ?? 0;
+                    final unit = it['product']?['unit'] ?? 'unit';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$qty× $pName ($unit)',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                          Text(
+                            '${(price * qty).toStringAsFixed(0)} FCFA',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+          ),
+          if (payStatus == 'pending')
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _showPaymentDialog(o['id'].toString(), o['totalAmount']);
+              },
+              icon: const Icon(Icons.payment, size: 16),
+              label: Text(locale.tr('pay_now')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D7A57),
+                foregroundColor: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -1005,12 +1183,18 @@ class _CustomerDashboardState extends State<CustomerDashboard>
     return Scaffold(
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
-              child: Image.asset('assets/images/novara_logo.jpg', width: 30, height: 30, fit: BoxFit.cover),
+              child: Image.asset('assets/images/novara_logo.jpg', width: 28, height: 28, fit: BoxFit.cover),
             ),
             const SizedBox(width: 8),
-            Text(locale.tr('role_customer')),
+            Flexible(
+              child: Text(
+                locale.tr('role_customer'),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -1041,17 +1225,51 @@ class _CustomerDashboardState extends State<CustomerDashboard>
             tooltip: 'Cart',
             onPressed: _showCartSheet,
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () =>
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              auth.logout();
-              Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const WelcomeScreen()));
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More Options',
+            onSelected: (val) {
+              if (val == 'notifications') {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+              } else if (val == 'refresh') {
+                _loadData();
+              } else if (val == 'logout') {
+                auth.logout();
+                Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const WelcomeScreen()));
+              }
             },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'notifications',
+                child: Row(
+                  children: [
+                    const Icon(Icons.notifications, size: 18, color: Color(0xFF0D7A57)),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Notifications' : 'Notifications'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    const Icon(Icons.refresh, size: 18, color: Colors.blueGrey),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Actualiser' : 'Refresh'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout, size: 18, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(locale.isFrench ? 'Déconnexion' : 'Logout'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
         bottom: TabBar(
@@ -1315,102 +1533,163 @@ class _CustomerDashboardState extends State<CustomerDashboard>
           final canModify = status == 'pending';
           final canCancel = !['delivered', 'in_transit', 'cancelled'].contains(status);
 
+          final items = (o['items'] as List<dynamic>?) ?? [];
+          final itemsSummary = items.map((it) {
+            final pName = it['product']?['name'] ?? 'Product';
+            final qty = it['quantity'] ?? 1;
+            return '$qty× $pName';
+          }).join(', ');
+
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Order #${o['id'].toString().substring(0, 8)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Chip(
-                        label: Text(status.toUpperCase(),
-                            style: const TextStyle(fontSize: 11, color: Colors.white)),
-                        backgroundColor: status == 'delivered'
-                            ? const Color(0xFF0D7A57)
-                            : status == 'cancelled'
-                                ? Colors.red
-                                : const Color(0xFFE67E22),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('${locale.tr('total')}: ${o['totalAmount']} FCFA',
-                      style: const TextStyle(fontSize: 14)),
-                  Text('Payment: ${payStatus.toUpperCase()}',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: payStatus == 'paid' ? const Color(0xFF0D7A57) : const Color(0xFFE67E22))),
-                  const Divider(height: 16),
-                  _buildTrackingTimeline(status, o['delivery']?['status']),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (payStatus == 'pending') ...[
-                        ElevatedButton.icon(
-                          onPressed: () => _showPaymentDialog(o['id'], o['totalAmount']),
-                          icon: const Icon(Icons.payment, size: 16),
-                          label: Text(locale.tr('pay_now')),
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0D7A57),
-                              foregroundColor: Colors.white),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _showOrderDetailsDialog(o),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.receipt_outlined, size: 18, color: Color(0xFF0D7A57)),
+                            const SizedBox(width: 6),
+                            Text('Order #${o['id'].toString().substring(0, 8)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ],
                         ),
-                        if (o['paymentReference'] != null)
-                          OutlinedButton.icon(
-                            onPressed: () => _verifyOrderPayment(o['id']),
-                            icon: const Icon(Icons.verified_outlined, size: 16),
-                            label: Text(locale.isFrench ? 'Vérifier paiement' : 'Verify Payment'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF0D7A57),
-                              side: const BorderSide(color: Color(0xFF0D7A57)),
+                        Chip(
+                          label: Text(status.toUpperCase(),
+                              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                          backgroundColor: status == 'delivered'
+                              ? const Color(0xFF0D7A57)
+                              : status == 'cancelled'
+                                  ? Colors.red
+                                  : const Color(0xFFE67E22),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    if (itemsSummary.isNotEmpty) ...[
+                      Text(
+                        itemsSummary,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('${locale.tr('total')}: ${o['totalAmount']} FCFA',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0D7A57))),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: payStatus == 'paid' ? Colors.green.shade50 : Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: payStatus == 'paid' ? Colors.green : Colors.amber),
+                          ),
+                          child: Text(
+                            payStatus.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: payStatus == 'paid' ? Colors.green.shade900 : Colors.amber.shade900,
                             ),
                           ),
+                        ),
                       ],
-                      if (canModify)
-                        OutlinedButton.icon(
-                          onPressed: () => _showModifyOrderDialog(o),
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: Text(locale.tr('modify_order')),
-                          style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.blue.shade700,
-                              side: BorderSide(color: Colors.blue.shade700)),
-                        ),
-                      if (canCancel)
-                        OutlinedButton.icon(
-                          onPressed: () => _confirmCancelOrder(o),
-                          icon: const Icon(Icons.cancel_outlined, size: 16),
-                          label: Text(locale.tr('cancel_order')),
-                          style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red)),
-                        ),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          LeafletOrderTrackingModal.show(
-                            context,
-                            order: Map<String, dynamic>.from(o),
-                            delivery: o['delivery'] != null ? Map<String, dynamic>.from(o['delivery']) : null,
-                          );
-                        },
-                        icon: const Icon(Icons.map, size: 16),
-                        label: Text(locale.isFrench ? 'Suivre (Leaflet)' : 'Track (Leaflet)'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade700,
-                          foregroundColor: Colors.white,
-                        ),
+                    ),
+                    if (o['shippingAddress'] != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${o['shippingAddress']}',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
+                    const Divider(height: 16),
+                    _buildTrackingTimeline(status, o['delivery']?['status']),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (payStatus == 'pending') ...[
+                          ElevatedButton.icon(
+                            onPressed: () => _showPaymentDialog(o['id'].toString(), o['totalAmount']),
+                            icon: const Icon(Icons.payment, size: 16),
+                            label: Text(locale.tr('pay_now')),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D7A57),
+                                foregroundColor: Colors.white),
+                          ),
+                          if (o['paymentReference'] != null)
+                            OutlinedButton.icon(
+                              onPressed: () => _verifyOrderPayment(o['id'].toString()),
+                              icon: const Icon(Icons.verified_outlined, size: 16),
+                              label: Text(locale.isFrench ? 'Vérifier paiement' : 'Verify Payment'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF0D7A57),
+                                side: const BorderSide(color: Color(0xFF0D7A57)),
+                              ),
+                            ),
+                        ],
+                        if (canModify)
+                          OutlinedButton.icon(
+                            onPressed: () => _showModifyOrderDialog(o),
+                            icon: const Icon(Icons.edit, size: 16),
+                            label: Text(locale.tr('modify_order')),
+                            style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.blue.shade700,
+                                side: BorderSide(color: Colors.blue.shade700)),
+                          ),
+                        if (canCancel)
+                          OutlinedButton.icon(
+                            onPressed: () => _confirmCancelOrder(o),
+                            icon: const Icon(Icons.cancel_outlined, size: 16),
+                            label: Text(locale.tr('cancel_order')),
+                            style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red)),
+                          ),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            LeafletOrderTrackingModal.show(
+                              context,
+                              order: Map<String, dynamic>.from(o),
+                              delivery: o['delivery'] != null ? Map<String, dynamic>.from(o['delivery']) : null,
+                            );
+                          },
+                          icon: const Icon(Icons.map, size: 16),
+                          label: Text(locale.isFrench ? 'Suivre (Leaflet)' : 'Track (Leaflet)'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
