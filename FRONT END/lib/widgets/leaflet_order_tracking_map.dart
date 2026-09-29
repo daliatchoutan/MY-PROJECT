@@ -196,7 +196,7 @@ class _LeafletOrderTrackingModalState extends State<LeafletOrderTrackingModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        locale.isFrench ? 'Suivi en Direct Leaflet' : 'Leaflet Live Order Tracking',
+                        locale.isFrench ? 'Suivi de Commande en Direct (Google Maps)' : 'Live Order Tracking (Google Maps)',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       Text(
@@ -305,7 +305,7 @@ class _LeafletOrderTrackingModalState extends State<LeafletOrderTrackingModal> {
                             width: 52,
                             height: 52,
                             child: Tooltip(
-                              message: '$courierName (${statusLabel})',
+                              message: '$courierName ($statusLabel)',
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFE67E22),
@@ -380,7 +380,7 @@ class _LeafletOrderTrackingModalState extends State<LeafletOrderTrackingModal> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
-                      'Leaflet | © OpenStreetMap contributors',
+                      'Google Maps',
                       style: TextStyle(fontSize: 10, color: Colors.black87),
                     ),
                   ),

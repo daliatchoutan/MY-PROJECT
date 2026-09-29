@@ -118,7 +118,9 @@ const manualOverride = async (req, res, next) => {
       'WATER_VALVE_ON', 'WATER_VALVE_OFF',
       'PUMP_ON', 'PUMP_OFF',
       'FAN_ON', 'FAN_OFF',
-      'HEATER_ON', 'HEATER_OFF'
+      'HEATER_ON', 'HEATER_OFF',
+      'MISTER_ON', 'MISTER_OFF',
+      'LIGHT_ON', 'LIGHT_OFF'
     ];
     if (!validActions.includes(action)) {
       return res.status(400).json({ message: `Invalid override action '${action}'. Valid actions: ${validActions.join(', ')}` });

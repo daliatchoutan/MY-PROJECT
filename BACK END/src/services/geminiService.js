@@ -64,14 +64,14 @@ CLINICAL & BEHAVIORAL CRITERIA:
 1. Posture & Mobility: Watch for lethargy, drooping head/wings, huddling/clustering, limping, or immobility.
 2. Head & Facial Features: Check comb/wattle color (cyanosis, pallor, lesions), eye discharge, or facial swelling.
 3. Respiration & Heat Distress: Check for open-mouth breathing, rapid panting, or wing spreading (heat stress correlation with temperature > 30°C).
-4. Flock Distribution: Note whether birds are evenly distributed or clustered in corners (indicator of chilling, drafts, or panic).
-5. Feeding & Drinking: Observe activity around feeding troughs and waterers.
+4. Flock Distribution & Density: Note whether birds are evenly distributed or clustered, piled in corners, or experiencing Overcrowding / High Density.
+5. Feeding & Drinking: Observe activity and competition around feeding troughs and waterers.
 
 OUTPUT FORMAT:
 You MUST respond with ONLY a valid, raw JSON object (no markdown fences, no explanatory text):
 {
   "healthStatus": "healthy" | "warning" | "critical",
-  "abnormalityDetected": "None" | "Heat Stress" | "Lethargy & Drooping" | "Clustering / Cold Stress" | "Respiratory Distress" | "Feather Pecking" | "Digestive / Vent Issue",
+  "abnormalityDetected": "None" | "Overcrowding / Excessive Density" | "Heat Stress" | "Lethargy & Drooping" | "Clustering / Cold Stress" | "Respiratory Distress" | "Feather Pecking" | "Digestive / Vent Issue",
   "confidence": 0.0 to 1.0,
   "flockBehaviorSummary": "Concise 1-2 sentence description of overall flock posture, activity, and distribution.",
   "symptoms": ["list", "of", "observed", "signs"],
@@ -190,6 +190,14 @@ const generateFallbackAnalysis = ({ sensorData = {}, farmName = '', flockType = 
     actions.push('Refill water reservoir immediately', 'Check automated water pump valve');
     summary = 'Flock behavior indicates agitation due to critical water depletion.';
     correlation = `Water level is critically low at ${water}%.`;
+  } else if (sensorData.densityStatus === 'overcrowded' || (sensorData.poultryCount && sensorData.capacity && sensorData.poultryCount > sensorData.capacity)) {
+    healthStatus = 'warning';
+    abnormality = 'Overcrowding / Excessive Density';
+    confidence = 0.94;
+    symptoms.push('Excessive bird density per square meter', 'Piling and flock agitation in coop corners', 'High competition at feeders');
+    actions.push('Thin out flock or partition coop into separate pens', 'Install additional feeder and drinker lines', 'Increase ventilation to disperse body heat and ammonia');
+    summary = 'Visual flock distribution indicates overcrowding and high stocking density.';
+    correlation = `Flock density exceeds optimal capacity (${sensorData.poultryCount || 'High'} birds in space rated for ${sensorData.capacity || 'lower count'}).`;
   }
 
   return {

@@ -1680,7 +1680,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
                             );
                           },
                           icon: const Icon(Icons.map, size: 16),
-                          label: Text(locale.isFrench ? 'Suivre (Leaflet)' : 'Track (Leaflet)'),
+                          label: Text(locale.isFrench ? 'Suivi de commande (Google Maps)' : 'Order Tracking (Google Maps)'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.teal.shade700,
                             foregroundColor: Colors.white,

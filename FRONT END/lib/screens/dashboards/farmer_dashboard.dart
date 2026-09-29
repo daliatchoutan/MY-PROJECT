@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -31,6 +31,15 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   List<dynamic> _pendingFarmers = [];
   List<dynamic> _pendingCouriers = [];
   bool _isLoading = true;
+
+  // AI Vision, Camera & IoT Condition state
+  Uint8List? _activeAiImageBytes;
+  String? _activeAiImageBase64;
+  String? _activeAiPresetKey;
+  Map<String, dynamic>? _lastAiDiagnosis;
+  bool _isAiAnalyzing = false;
+  String? _selectedDeviceForAi;
+  String? _selectedFarmForAi;
 
   @override
   void initState() {
@@ -1056,13 +1065,43 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
 
   void _triggerManualOverride(String deviceId, String action) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       final res = await auth.api.manualOverride(deviceId, action);
       if (!mounted) return;
+
+      String actionLabel = action;
+      if (locale.isFrench) {
+        if (action == 'FEEDER_ON' || action == 'FEED') {
+          actionLabel = 'Mangeoire activée (Distribution aliment)';
+        } else if (action == 'WATER_VALVE_ON') {
+          actionLabel = 'Vanne d\'eau ouverte (Abreuvoir activé)';
+        } else if (action == 'WATER_VALVE_OFF') {
+          actionLabel = 'Vanne d\'eau fermée';
+        } else if (action == 'FAN_ON') {
+          actionLabel = 'Ventilateur de refroidissement activé';
+        } else if (action == 'FAN_OFF') {
+          actionLabel = 'Ventilateur arrêté';
+        } else if (action == 'HEATER_ON') {
+          actionLabel = 'Lampe chauffante activée';
+        } else if (action == 'HEATER_OFF') {
+          actionLabel = 'Lampe chauffante arrêtée';
+        } else if (action == 'MISTER_ON') {
+          actionLabel = 'Brumisateur activé';
+        } else if (action == 'MISTER_OFF') {
+          actionLabel = 'Brumisateur arrêté';
+        }
+      }
+
       scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(res['message'] ?? 'Override command executed'), backgroundColor: Colors.amber.shade900),
+        SnackBar(
+          content: Text(res['message'] ?? '$actionLabel - Commande transmise à l\'ESP32'),
+          backgroundColor: const Color(0xFF0D7A57),
+          duration: const Duration(seconds: 3),
+        ),
       );
+      _loadFarmerData();
     } catch (e) {
       if (!mounted) return;
       scaffoldMessenger.showSnackBar(
@@ -1071,30 +1110,317 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     }
   }
 
-  void _simulateTelemetry(String deviceSerial) async {
+  void _simulateTelemetry(String deviceSerial) {
+    _showTelemetrySimulatorDialog(deviceSerial);
+  }
+
+  void _showTelemetrySimulatorDialog(String deviceSerial) {
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.sensors, color: Color(0xFF0D7A57)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      locale.isFrench
+                          ? 'Simulateur Télémétrie ESP32 & Scénarios'
+                          : 'ESP32 Telemetry Simulator & Scenarios',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              Text(
+                locale.isFrench
+                    ? 'Injectez des relevés pour tester les automatismes et les alertes du système :'
+                    : 'Inject sensor readings to test automated triggers and environmental alerts:',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.check, color: Colors.green)),
+                title: Text(locale.isFrench ? '1. Conditions Optimales' : '1. Optimal Conditions'),
+                subtitle: const Text('Temp: 23.5°C | Hum: 65% | Alim: 85% | Eau: 90%'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _simulateCustomTelemetry(deviceSerial, temp: 23.5, hum: 65.0, food: 85.0, water: 90.0, desc: 'Conditions Optimales');
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(backgroundColor: Colors.orange.shade50, child: const Icon(Icons.thermostat, color: Colors.orange)),
+                title: Text(locale.isFrench ? '2. Alerte Chaleur Extrême (Active Ventilateur)' : '2. Heat Stress Alert (Triggers Fan)'),
+                subtitle: const Text('Temp: 35.2°C | Hum: 78% | Alim: 40% | Eau: 35%'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _simulateCustomTelemetry(deviceSerial, temp: 35.2, hum: 78.0, food: 40.0, water: 35.0, desc: 'Stress Thermique (Ventilation Auto)');
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(backgroundColor: Colors.blue.shade50, child: const Icon(Icons.ac_unit, color: Colors.blue)),
+                title: Text(locale.isFrench ? '3. Alerte Froid & Engourdissement (Active Chauffage)' : '3. Cold Stress Alert (Triggers Heater)'),
+                subtitle: const Text('Temp: 16.0°C | Hum: 55% | Alim: 70% | Eau: 80%'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _simulateCustomTelemetry(deviceSerial, temp: 16.0, hum: 55.0, food: 70.0, water: 80.0, desc: 'Stress au Froid (Chauffage Auto)');
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(backgroundColor: Colors.red.shade50, child: const Icon(Icons.restaurant, color: Colors.red)),
+                title: Text(locale.isFrench ? '4. Niveau Mangeoire Bas (Distribuer Aliment)' : '4. Critical Low Feed Alert'),
+                subtitle: const Text('Temp: 24.0°C | Hum: 60% | Alim: 8.0% | Eau: 85%'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _simulateCustomTelemetry(deviceSerial, temp: 24.0, hum: 60.0, food: 8.0, water: 85.0, desc: 'Manque d\'Aliment');
+                },
+              ),
+              ListTile(
+                leading: CircleAvatar(backgroundColor: Colors.indigo.shade50, child: const Icon(Icons.water_drop, color: Colors.indigo)),
+                title: Text(locale.isFrench ? '5. Niveau Abreuvoir Bas (Active Pompe)' : '5. Critical Low Water Alert (Auto Pump)'),
+                subtitle: const Text('Temp: 25.0°C | Hum: 58% | Alim: 75% | Eau: 10.0%'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _simulateCustomTelemetry(deviceSerial, temp: 25.0, hum: 58.0, food: 75.0, water: 10.0, desc: 'Manque d\'Eau');
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _simulateCustomTelemetry(String deviceSerial, {required double temp, required double hum, required double food, required double water, required String desc}) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       final res = await auth.api.sendTelemetry({
         'deviceSerial': deviceSerial,
-        'foodLevel': 15.0, // Low -> triggers dispenser
-        'waterLevel': 85.0,
-        'temperature': 34.5, // High -> triggers fan
-        'humidity': 60.0,
+        'temperature': temp,
+        'humidity': hum,
+        'foodLevel': food,
+        'waterLevel': water,
       });
       if (!mounted) return;
+      final triggers = res['automationTriggers'] as List<dynamic>? ?? [];
+      String msg = 'Télémétrie injectée ($desc).';
+      if (triggers.isNotEmpty) {
+        msg += ' Déclenchements automatiques: ${triggers.map((t) => t['action']).join(', ')}';
+      }
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Telemetry sent! Triggers: ${res['automationTriggers']?.length ?? 0}'),
-          backgroundColor: const Color(0xFF0D7A57),
+          content: Text(msg),
+          backgroundColor: triggers.isNotEmpty ? Colors.amber.shade900 : const Color(0xFF0D7A57),
+          duration: const Duration(seconds: 4),
         ),
       );
       _loadFarmerData();
     } catch (e) {
       if (!mounted) return;
       scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Error simulating telemetry: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Erreur simulation télémétrie: $e'), backgroundColor: Colors.red),
       );
+    }
+  }
+
+  Future<void> _loadPresetAiScenario(String presetKey) async {
+    String assetPath;
+    String anomalyHint;
+    switch (presetKey) {
+      case 'overcrowding':
+        assetPath = 'assets/images/farm_background.jpg';
+        anomalyHint = 'Surpeuplement & Densité excessive';
+        break;
+      case 'heat_stress':
+        assetPath = 'assets/images/farm_bg_3.jpg';
+        anomalyHint = 'Stress Thermique & Halètement';
+        break;
+      case 'cold_stress':
+        assetPath = 'assets/images/farm_bg_4.jpg';
+        anomalyHint = 'Stress au Froid & Amas';
+        break;
+      case 'lethargy':
+        assetPath = 'assets/images/farm_bg_5.jpg';
+        anomalyHint = 'Léthargie & Prostration';
+        break;
+      case 'healthy':
+      default:
+        assetPath = 'assets/images/product_broiler.jpg';
+        anomalyHint = 'Troupeau Sain & Actif';
+        break;
+    }
+
+    try {
+      final ByteData data = await rootBundle.load(assetPath);
+      final Uint8List bytes = data.buffer.asUint8List();
+      final base64Img = base64Encode(bytes);
+      if (mounted) {
+        setState(() {
+          _activeAiPresetKey = presetKey;
+          _activeAiImageBytes = bytes;
+          _activeAiImageBase64 = base64Img;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Scénario "$anomalyHint" chargé. Cliquez sur "Lancer l\'analyse IA".'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF0D7A57),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur chargement image : $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _captureFromCamera() async {
+    final picker = ImagePicker();
+    try {
+      final picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        setState(() {
+          _activeAiImageBytes = bytes;
+          _activeAiImageBase64 = base64Encode(bytes);
+          _activeAiPresetKey = 'camera';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur appareil photo: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _captureFromGallery() async {
+    final picker = ImagePicker();
+    try {
+      final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 85);
+      if (picked != null) {
+        final bytes = await picked.readAsBytes();
+        setState(() {
+          _activeAiImageBytes = bytes;
+          _activeAiImageBase64 = base64Encode(bytes);
+          _activeAiPresetKey = 'gallery';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur galerie: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _captureFromEspCamStream() async {
+    final camDevices = _devices.where((d) =>
+        (d['type']?.toString().toLowerCase().contains('cam') ?? false) ||
+        (d['deviceSerial']?.toString().toLowerCase().contains('cam') ?? false)).toList();
+
+    if (camDevices.isNotEmpty) {
+      setState(() {
+        _selectedDeviceForAi = camDevices.first['deviceSerial'];
+      });
+      await _loadPresetAiScenario('overcrowding');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Flux ESP32-CAM (${camDevices.first['name']}) connecté.'),
+            backgroundColor: const Color(0xFF0D7A57),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      await _loadPresetAiScenario('overcrowding');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Flux ESP32-CAM en direct simulé.'),
+            backgroundColor: Color(0xFF0D7A57),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _runGeminiAiAnalysis() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false);
+
+    if (_activeAiImageBase64 == null && _selectedDeviceForAi == null) {
+      await _loadPresetAiScenario('overcrowding');
+    }
+
+    setState(() => _isAiAnalyzing = true);
+
+    try {
+      final res = await auth.api.analyzePoultryWithGemini(
+        deviceSerial: _selectedDeviceForAi,
+        imageBase64: _activeAiImageBase64,
+        farmId: _selectedFarmForAi ?? (_farms.isNotEmpty ? _farms.first['id']?.toString() : null),
+        sensorData: _liveReadings,
+      );
+
+      if (res['success'] == true && res['diagnosis'] != null) {
+        setState(() {
+          _lastAiDiagnosis = Map<String, dynamic>.from(res['diagnosis']);
+          _isAiAnalyzing = false;
+        });
+        await _loadFarmerData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                locale.isFrench
+                    ? 'Diagnostic Gemini IA : ${_lastAiDiagnosis!['abnormalityDetected']}'
+                    : 'Gemini AI Diagnosis: ${_lastAiDiagnosis!['abnormalityDetected']}',
+              ),
+              backgroundColor: _lastAiDiagnosis!['healthStatus'] == 'healthy'
+                  ? const Color(0xFF0D7A57)
+                  : Colors.orange.shade900,
+            ),
+          );
+        }
+      } else {
+        setState(() => _isAiAnalyzing = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res['message'] ?? 'Erreur lors de l\'analyse Gemini'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isAiAnalyzing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur analyse Gemini IA: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -2096,10 +2422,12 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
   }
 
   Widget _buildIoTTab() {
+    final locale = Provider.of<LocaleProvider>(context);
+
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDeviceDialog,
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: const Color(0xFF0D7A57),
         child: const Icon(Icons.add_location_alt, color: Colors.white),
       ),
       body: RefreshIndicator(
@@ -2109,129 +2437,441 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-                  const Center(child: Text('No IoT devices registered. Pull down to refresh or click + to add.')),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.sensors_off, size: 56, color: Colors.grey.shade400),
+                          const SizedBox(height: 12),
+                          Text(
+                            locale.isFrench
+                                ? 'Aucun contrôleur IoT ou capteur enregistré.'
+                                : 'No IoT devices or sensors registered.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            locale.isFrench
+                                ? 'Tirez vers le bas pour actualiser ou appuyez sur + pour ajouter un contrôleur ESP32.'
+                                : 'Pull down to refresh or tap + to register an ESP32 controller.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 13, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               )
             : ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 itemCount: _devices.length,
                 itemBuilder: (ctx, idx) {
                   final d = _devices[idx];
                   final reading = _liveReadings[d['id']] ?? {};
 
-                  final food = reading['foodLevel'] ?? 50.0;
-                  final water = reading['waterLevel'] ?? 75.0;
-                  final temp = reading['temperature'] ?? 24.5;
-                  final humidity = reading['humidity'] ?? 65.0;
-                  final isAuto = d['autoMode'] ?? true;
-                  final healthStatus = d['healthStatus'] ?? 'good';
+                  final double food = (reading['foodLevel'] is num) ? (reading['foodLevel'] as num).toDouble() : 50.0;
+                  final double water = (reading['waterLevel'] is num) ? (reading['waterLevel'] as num).toDouble() : 75.0;
+                  final double temp = (reading['temperature'] is num) ? (reading['temperature'] as num).toDouble() : 24.5;
+                  final double humidity = (reading['humidity'] is num) ? (reading['humidity'] as num).toDouble() : 65.0;
+                  final bool isAuto = d['autoMode'] ?? true;
+                  final String healthStatus = (d['healthStatus'] ?? 'good').toString().toLowerCase();
+
+                  // Feeding condition styling
+                  final double foodThreshold = (d['foodThreshold'] is num) ? (d['foodThreshold'] as num).toDouble() : 20.0;
+                  final bool isFoodLow = food <= foodThreshold;
+                  final Color foodColor = isFoodLow ? Colors.red : (food < 45 ? Colors.orange : Colors.green);
+
+                  // Watering condition styling
+                  final double waterThreshold = (d['waterThreshold'] is num) ? (d['waterThreshold'] as num).toDouble() : 20.0;
+                  final bool isWaterLow = water <= waterThreshold;
+                  final Color waterColor = isWaterLow ? Colors.red : (water < 45 ? Colors.blue.shade700 : const Color(0xFF0288D1));
+
+                  // Temperature condition styling
+                  final double tempMin = (d['tempMin'] is num) ? (d['tempMin'] as num).toDouble() : 20.0;
+                  final double tempMax = (d['tempMax'] is num) ? (d['tempMax'] as num).toDouble() : 30.0;
+                  final bool isHeatStress = temp > tempMax;
+                  final bool isColdStress = temp < tempMin;
+                  final Color tempColor = isHeatStress ? Colors.red.shade700 : (isColdStress ? Colors.blue.shade700 : Colors.green.shade700);
 
                   return Card(
-                    elevation: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 3,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // 1. Cluster Header Bar
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(d['name'] ?? 'Device Cluster', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                  Text(d['deviceSerial'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                ],
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D7A57).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.memory, color: Color(0xFF0D7A57), size: 26),
                               ),
-                              Chip(
-                                label: Text('Health: ${healthStatus.toUpperCase()}'),
-                                backgroundColor: healthStatus == 'good' ? Colors.green.shade100 : Colors.orange.shade100,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      d['name'] ?? (locale.isFrench ? 'Contrôleur Élevage' : 'Poultry Controller'),
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${d['deviceSerial'] ?? ''} • ${d['farm']?['name'] ?? (locale.isFrench ? 'Bâtiment Connecté' : 'Coop')}',
+                                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: healthStatus == 'good' || healthStatus == 'healthy' || healthStatus == 'excellent'
+                                      ? Colors.green.shade50
+                                      : Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: healthStatus == 'good' || healthStatus == 'healthy' || healthStatus == 'excellent'
+                                        ? Colors.green.shade300
+                                        : Colors.orange.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      size: 8,
+                                      color: healthStatus == 'good' || healthStatus == 'healthy' || healthStatus == 'excellent'
+                                          ? Colors.green
+                                          : Colors.orange,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      healthStatus.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: healthStatus == 'good' || healthStatus == 'healthy' || healthStatus == 'excellent'
+                                            ? Colors.green.shade800
+                                            : Colors.orange.shade900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                          const Divider(),
-                          // Auto vs Manual Toggle Switch
+                          const SizedBox(height: 12),
+
+                          // 2. Auto vs Manual Mode Switch Banner
                           Container(
-                            color: isAuto ? Colors.green.shade50 : Colors.amber.shade50,
+                            decoration: BoxDecoration(
+                              color: isAuto ? Colors.green.shade50 : Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isAuto ? Colors.green.shade200 : Colors.amber.shade300,
+                              ),
+                            ),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  isAuto ? '🤖 AUTOMATIC THRESHOLD CONTROL' : '⚙️ MANUAL OVERRIDE CONTROL',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: isAuto ? Colors.green.shade900 : Colors.amber.shade900,
+                                Icon(
+                                  isAuto ? Icons.smart_toy : Icons.pan_tool,
+                                  color: isAuto ? Colors.green.shade800 : Colors.amber.shade900,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isAuto
+                                            ? (locale.isFrench ? 'RÉGULATION AUTOMATIQUE (ESP32)' : 'AUTOMATIC MODE (ESP32)')
+                                            : (locale.isFrench ? 'MODE CONTRÔLE MANUEL FORCÉ' : 'MANUAL OVERRIDE MODE'),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                          color: isAuto ? Colors.green.shade900 : Colors.amber.shade900,
+                                        ),
+                                      ),
+                                      Text(
+                                        isAuto
+                                            ? (locale.isFrench ? 'Régulation autonome des mangeoires et climat' : 'Autonomous threshold control active')
+                                            : (locale.isFrench ? 'Les boutons d\'action ci-dessous sont déverrouillés' : 'Manual actuator triggers unlocked'),
+                                        style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 Switch(
                                   value: isAuto,
-                                  activeThumbColor: Colors.green,
+                                  activeThumbColor: const Color(0xFF0D7A57),
                                   onChanged: (val) => _toggleAutoMode(d['id'], isAuto),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildGaugeCard('Water Level', '${water.toStringAsFixed(1)}%', Icons.water_drop, water < (d['waterThreshold'] ?? 20) ? Colors.red : Colors.blue)),
-                              Expanded(child: _buildGaugeCard('Temperature', '${temp.toStringAsFixed(1)}°C', Icons.thermostat, Colors.orange)),
-                            ],
+                          const SizedBox(height: 14),
+
+                          // 3. Condition Section: Alimentation / Feeding
+                          _buildConditionCard(
+                            title: locale.isFrench ? 'Alimentation du Troupeau' : 'Flock Feeding Condition',
+                            icon: Icons.restaurant,
+                            iconColor: foodColor,
+                            valueLabel: '${food.toStringAsFixed(1)}%',
+                            statusText: isFoodLow
+                                ? (locale.isFrench ? '⚠️ Mangeoire quasi-vide' : '⚠️ Feed critically low')
+                                : (locale.isFrench ? '✅ Niveau satisfaisant' : '✅ Sufficient feed'),
+                            progressValue: (food / 100).clamp(0.0, 1.0),
+                            progressColor: foodColor,
+                            actionButton: ElevatedButton.icon(
+                              onPressed: () => _triggerManualOverride(d['id'], 'FEEDER_ON'),
+                              icon: const Icon(Icons.touch_app, size: 14),
+                              label: Text(locale.isFrench ? 'Distribuer aliment' : 'Dispense Feed'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber.shade800,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(child: _buildGaugeCard('Food Level', '${food.toStringAsFixed(1)}%', Icons.restaurant, food < (d['foodThreshold'] ?? 20) ? Colors.red : Colors.green)),
-                              Expanded(child: _buildGaugeCard('Humidity', '${humidity.toStringAsFixed(1)}%', Icons.water, Colors.teal)),
-                            ],
+                          const SizedBox(height: 10),
+
+                          // 4. Condition Section: Abreuvement / Watering
+                          _buildConditionCard(
+                            title: locale.isFrench ? 'Abreuvement & Hydratation' : 'Watering & Hydration',
+                            icon: Icons.water_drop,
+                            iconColor: waterColor,
+                            valueLabel: '${water.toStringAsFixed(1)}%',
+                            statusText: isWaterLow
+                                ? (locale.isFrench ? '⚠️ Eau faible (Vanne requise)' : '⚠️ Low water level')
+                                : (locale.isFrench ? '✅ Abreuvoir optimal' : '✅ Waterers optimal'),
+                            progressValue: (water / 100).clamp(0.0, 1.0),
+                            progressColor: waterColor,
+                            actionButton: Wrap(
+                              spacing: 6,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () => _triggerManualOverride(d['id'], 'WATER_VALVE_ON'),
+                                  icon: const Icon(Icons.water, size: 14),
+                                  label: Text(locale.isFrench ? 'Ouvrir vanne' : 'Open Valve'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade700,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                OutlinedButton(
+                                  onPressed: () => _triggerManualOverride(d['id'], 'WATER_VALVE_OFF'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.blue.shade800,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    textStyle: const TextStyle(fontSize: 11),
+                                  ),
+                                  child: Text(locale.isFrench ? 'Fermer' : 'Close'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 5. Condition Section: Régulation Thermique & Climat
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.thermostat, color: tempColor, size: 20),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          locale.isFrench ? 'Régulation Thermique & Climat' : 'Thermal & Climate Regulation',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      '${temp.toStringAsFixed(1)}°C',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: tempColor),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      isHeatStress
+                                          ? (locale.isFrench ? '🔥 Risque de stress thermique' : '🔥 Heat stress danger')
+                                          : (isColdStress
+                                              ? (locale.isFrench ? '❄️ Froid / Engourdissement' : '❄️ Cold stress danger')
+                                              : (locale.isFrench ? '✅ Température idéale (20-28°C)' : '✅ Optimal comfort zone')),
+                                      style: TextStyle(fontSize: 11, color: tempColor, fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      'Humidité : ${humidity.toStringAsFixed(1)}%',
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                const Divider(height: 1),
+                                const SizedBox(height: 8),
+                                Text(
+                                  locale.isFrench ? 'Actionneurs de régulation thermique :' : 'Thermal Actuators Control:',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                                ),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: [
+                                    // Fan Controls
+                                    ElevatedButton.icon(
+                                      onPressed: () => _triggerManualOverride(d['id'], 'FAN_ON'),
+                                      icon: const Icon(Icons.mode_fan_off_rounded, size: 14),
+                                      label: Text(locale.isFrench ? 'Ventilateur ON' : 'Fan ON'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.teal.shade700,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        textStyle: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                    OutlinedButton(
+                                      onPressed: () => _triggerManualOverride(d['id'], 'FAN_OFF'),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        textStyle: const TextStyle(fontSize: 11),
+                                      ),
+                                      child: Text(locale.isFrench ? 'Fan OFF' : 'Fan OFF'),
+                                    ),
+                                    // Heater Controls
+                                    ElevatedButton.icon(
+                                      onPressed: () => _triggerManualOverride(d['id'], 'HEATER_ON'),
+                                      icon: const Icon(Icons.lightbulb_outline, size: 14),
+                                      label: Text(locale.isFrench ? 'Chauffage ON' : 'Heater ON'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange.shade800,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        textStyle: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                    // Mister / Fogger
+                                    ElevatedButton.icon(
+                                      onPressed: () => _triggerManualOverride(d['id'], 'MISTER_ON'),
+                                      icon: const Icon(Icons.water, size: 14),
+                                      label: Text(locale.isFrench ? 'Brumisateur' : 'Mister'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.cyan.shade800,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        textStyle: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 12),
+
+                          // 6. Camera & AI Shortcut Row
+                          InkWell(
+                            onTap: () {
+                              _tabController.animateTo(2); // Jump to AI Alerts Tab
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D7A57).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF0D7A57).withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.camera_alt, color: Color(0xFF0D7A57), size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          locale.isFrench
+                                              ? 'Surveillance Visuelle & Détection Surpeuplement'
+                                              : 'Vision Monitoring & Overcrowding Detection',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0D7A57)),
+                                        ),
+                                        Text(
+                                          locale.isFrench
+                                              ? 'Consultez les clichés ESP32-CAM et les diagnostics IA Gemini'
+                                              : 'Inspect ESP32-CAM images and Gemini AI health alerts',
+                                          style: const TextStyle(fontSize: 10, color: Colors.black87),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right, color: Color(0xFF0D7A57)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 7. Footer Action Buttons
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               TextButton.icon(
                                 onPressed: () => _showSensorHistoryDialog(d['id'], d['name']),
-                                icon: const Icon(Icons.history),
-                                label: const Text('Review Sensor Log'),
+                                icon: const Icon(Icons.history, size: 16),
+                                label: Text(locale.isFrench ? 'Historique' : 'Sensor Log'),
+                                style: TextButton.styleFrom(padding: EdgeInsets.zero),
                               ),
                               ElevatedButton.icon(
                                 onPressed: () => _simulateTelemetry(d['deviceSerial']),
-                                icon: const Icon(Icons.sensors),
-                                label: const Text('Simulate Telemetry'),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
+                                icon: const Icon(Icons.tune, size: 16),
+                                label: Text(locale.isFrench ? 'Simuler Capteurs' : 'Test Scenarios'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0D7A57),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ],
                           ),
-                          if (!isAuto) ...[
-                            const Divider(),
-                            const Text('Manual Actuator Controls:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                ElevatedButton(
-                                  onPressed: () => _triggerManualOverride(d['id'], 'FEEDER_ON'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade800, foregroundColor: Colors.white),
-                                  child: const Text('Trigger Feeder'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => _triggerManualOverride(d['id'], 'WATER_VALVE_ON'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800, foregroundColor: Colors.white),
-                                  child: const Text('Open Water Valve'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => _triggerManualOverride(d['id'], 'FAN_ON'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade800, foregroundColor: Colors.white),
-                                  child: const Text('Activate Cooling Fan'),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -2242,19 +2882,63 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
     );
   }
 
-  Widget _buildGaugeCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      color: color.withValues(alpha: 0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 4),
-            Text(title, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
+  Widget _buildConditionCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required String valueLabel,
+    required String statusText,
+    required double progressValue,
+    required Color progressColor,
+    required Widget actionButton,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: iconColor, size: 18),
+                  const SizedBox(width: 6),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ],
+              ),
+              Text(valueLabel, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: iconColor)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progressValue,
+              minHeight: 7,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  statusText,
+                  style: TextStyle(fontSize: 11, color: progressColor, fontWeight: FontWeight.w600),
+                ),
+              ),
+              actionButton,
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -2268,29 +2952,34 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
       onRefresh: _loadFarmerData,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         children: [
-          // Responsive Quick-Action Banner to open Notifications Screen
+          // 1. Alert Center Header Banner
           Card(
             color: const Color(0xFF0D7A57).withValues(alpha: 0.08),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFF0D7A57), width: 1)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF0D7A57), width: 1),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
-                  const Icon(Icons.notifications_active, color: Color(0xFF0D7A57), size: 28),
-                  const SizedBox(width: 12),
+                  const Icon(Icons.notifications_active, color: Color(0xFF0D7A57), size: 26),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          locale.isFrench ? 'Centre d\'alertes et notifications' : 'Alert & Notification Center',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          locale.isFrench ? 'Centre d\'Alertes IA & Télémétrie' : 'AI Alert & Vision Center',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         Text(
-                          locale.isFrench ? '$allNotifsCount notification(s) au total' : '$allNotifsCount total notifications recorded',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          locale.isFrench
+                              ? '$allNotifsCount alerte(s) enregistrée(s) au total'
+                              : '$allNotifsCount total recorded flock notifications',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -2305,7 +2994,8 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0D7A57),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      textStyle: const TextStyle(fontSize: 11),
                     ),
                     child: Text(locale.isFrench ? 'Voir tout' : 'View All'),
                   ),
@@ -2313,71 +3003,182 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          // Gemini AI Vision & Behavior Diagnostics Card
+          const SizedBox(height: 14),
+
+          // 2. Camera View & Vision Stream Card
           Card(
             elevation: 3,
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: Color(0xFF0D7A57), width: 1.5),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF0D7A57), Color(0xFF1E88E5)],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              locale.isFrench
-                                  ? 'Diagnostic Avicole & Comportement Gemini IA'
-                                  : 'Gemini AI Poultry Vision & Behavior Diagnostics',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0D7A57),
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                            child: const Icon(Icons.videocam, color: Colors.white, size: 20),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                locale.isFrench ? 'Surveillance Caméra ESP32-CAM' : 'ESP32-CAM Live Vision Stream',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              Text(
+                                locale.isFrench ? 'Flux optique & détection de densité' : 'Optical feed & flock density vision',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.fiber_manual_record, color: Colors.red, size: 10),
+                            const SizedBox(width: 4),
                             Text(
-                              locale.isFrench
-                                  ? 'Analyse multimodale par caméra ESP32-CAM & capteurs environnementaux'
-                                  : 'Multimodal vision analysis via ESP32-CAM & environmental sensors',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              locale.isFrench ? 'EN DIRECT' : 'LIVE',
+                              style: const TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  Row(
+                  const SizedBox(height: 12),
+
+                  // Image Viewer Display
+                  Container(
+                    height: 190,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: _activeAiImageBytes != null
+                              ? Image.memory(_activeAiImageBytes!, fit: BoxFit.cover)
+                              : Image.asset(
+                                  'assets/images/farm_background.jpg',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => const Center(
+                                    child: Icon(Icons.camera_alt, color: Colors.white54, size: 48),
+                                  ),
+                                ),
+                        ),
+                        // Overlay Gradient
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            height: 60,
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Colors.transparent, Colors.black.withValues(alpha: 0.85)],
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Stream info overlay
+                        Positioned(
+                          left: 10,
+                          bottom: 8,
+                          right: 10,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.videocam_outlined, color: Colors.white, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _activeAiPresetKey != null
+                                        ? 'Scénario: ${_activeAiPresetKey!.toUpperCase()}'
+                                        : 'ESP32-CAM • Salle d\'engraissement A',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              if (_lastAiDiagnosis != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: _lastAiDiagnosis!['healthStatus'] == 'healthy'
+                                        ? Colors.green
+                                        : (_lastAiDiagnosis!['healthStatus'] == 'warning' ? Colors.orange : Colors.red),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${_lastAiDiagnosis!['abnormalityDetected']} (${((_lastAiDiagnosis!['confidence'] ?? 0.9) * 100).toInt()}%)',
+                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Image Capture Action Buttons
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _showGeminiAnalysisDialog,
-                          icon: const Icon(Icons.camera_alt, size: 18),
-                          label: Text(
-                            locale.isFrench
-                                ? 'Lancer l\'Analyse Gemini IA'
-                                : 'Run Gemini AI Analysis',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D7A57),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
+                      OutlinedButton.icon(
+                        onPressed: _captureFromCamera,
+                        icon: const Icon(Icons.camera_alt, size: 15),
+                        label: Text(locale.isFrench ? 'Appareil Photo' : 'Take Photo'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          textStyle: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _captureFromGallery,
+                        icon: const Icon(Icons.photo_library, size: 15),
+                        label: Text(locale.isFrench ? 'Galerie' : 'Gallery'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          textStyle: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _captureFromEspCamStream,
+                        icon: const Icon(Icons.sensors, size: 15),
+                        label: Text(locale.isFrench ? 'Flux ESP32-CAM' : 'ESP32-CAM'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          textStyle: const TextStyle(fontSize: 11),
                         ),
                       ),
                     ],
@@ -2386,29 +3187,360 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // 3. Preset Vision Inspection Scenarios (One-tap testing for anomalies like Overcrowding)
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome, color: Color(0xFF0D7A57), size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        locale.isFrench
+                            ? 'Scénarios de Vision & Détection Rapide :'
+                            : 'Quick Vision & Anomaly Scenarios:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    locale.isFrench
+                        ? 'Sélectionnez un scénario pour tester la détection de surpeuplement ou stress :'
+                        : 'Select a scenario to test overcrowding, stress, or normal flock distribution:',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ActionChip(
+                        avatar: const CircleAvatar(
+                          backgroundColor: Colors.red,
+                          radius: 7,
+                        ),
+                        label: Text(
+                          locale.isFrench ? '⚠️ Surpeuplement & Densité' : '⚠️ Overcrowding & Density',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _activeAiPresetKey == 'overcrowding' ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: _activeAiPresetKey == 'overcrowding' ? Colors.red.shade100 : Colors.grey.shade100,
+                        onPressed: () => _loadPresetAiScenario('overcrowding'),
+                      ),
+                      ActionChip(
+                        avatar: const CircleAvatar(
+                          backgroundColor: Colors.orange,
+                          radius: 7,
+                        ),
+                        label: Text(
+                          locale.isFrench ? '🔥 Stress Thermique & Halètement' : '🔥 Heat Stress & Panting',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _activeAiPresetKey == 'heat_stress' ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: _activeAiPresetKey == 'heat_stress' ? Colors.orange.shade100 : Colors.grey.shade100,
+                        onPressed: () => _loadPresetAiScenario('heat_stress'),
+                      ),
+                      ActionChip(
+                        avatar: const CircleAvatar(
+                          backgroundColor: Colors.blue,
+                          radius: 7,
+                        ),
+                        label: Text(
+                          locale.isFrench ? '❄️ Stress au Froid / Amas' : '❄️ Cold Stress / Huddling',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _activeAiPresetKey == 'cold_stress' ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: _activeAiPresetKey == 'cold_stress' ? Colors.blue.shade100 : Colors.grey.shade100,
+                        onPressed: () => _loadPresetAiScenario('cold_stress'),
+                      ),
+                      ActionChip(
+                        avatar: const CircleAvatar(
+                          backgroundColor: Colors.purple,
+                          radius: 7,
+                        ),
+                        label: Text(
+                          locale.isFrench ? '🩺 Léthargie & Prostration' : '🩺 Lethargy & Sickness',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _activeAiPresetKey == 'lethargy' ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: _activeAiPresetKey == 'lethargy' ? Colors.purple.shade100 : Colors.grey.shade100,
+                        onPressed: () => _loadPresetAiScenario('lethargy'),
+                      ),
+                      ActionChip(
+                        avatar: const CircleAvatar(
+                          backgroundColor: Colors.green,
+                          radius: 7,
+                        ),
+                        label: Text(
+                          locale.isFrench ? '✅ Troupeau Sain & Actif' : '✅ Healthy Flock',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _activeAiPresetKey == 'healthy' ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        backgroundColor: _activeAiPresetKey == 'healthy' ? Colors.green.shade100 : Colors.grey.shade100,
+                        onPressed: () => _loadPresetAiScenario('healthy'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Run Analysis Trigger Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isAiAnalyzing ? null : _runGeminiAiAnalysis,
+                      icon: _isAiAnalyzing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.auto_awesome, size: 20),
+                      label: Text(
+                        _isAiAnalyzing
+                            ? (locale.isFrench ? 'Analyse Gemini Vision en cours...' : 'Analyzing with Gemini Vision...')
+                            : (locale.isFrench ? 'Lancer le Diagnostic Gemini IA' : 'Run Gemini AI Vision Diagnosis'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D7A57),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _showGeminiAnalysisDialog,
+                      icon: const Icon(Icons.tune, size: 16),
+                      label: Text(
+                        locale.isFrench
+                            ? 'Formulaire d\'Analyse Personnalisée'
+                            : 'Custom Analysis Form',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 4. Active AI Diagnosis Result Card (Displays clinical findings, symptoms, actions)
+          if (_lastAiDiagnosis != null) ...[
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: _lastAiDiagnosis!['healthStatus'] == 'healthy'
+                      ? Colors.green
+                      : (_lastAiDiagnosis!['healthStatus'] == 'warning' ? Colors.orange : Colors.red),
+                  width: 1.5,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _lastAiDiagnosis!['healthStatus'] == 'healthy'
+                                ? Colors.green.shade50
+                                : (_lastAiDiagnosis!['healthStatus'] == 'warning' ? Colors.orange.shade50 : Colors.red.shade50),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            _lastAiDiagnosis!['healthStatus'] == 'healthy'
+                                ? Icons.verified
+                                : Icons.warning_amber_rounded,
+                            color: _lastAiDiagnosis!['healthStatus'] == 'healthy'
+                                ? Colors.green.shade800
+                                : Colors.red.shade800,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_lastAiDiagnosis!['abnormalityDetected'] ?? 'Diagnostic'}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              Text(
+                                '${locale.isFrench ? 'Niveau de confiance IA' : 'AI Confidence'}: ${((_lastAiDiagnosis!['confidence'] ?? 0.9) * 100).toInt()}% • Gemini 2.5 Flash',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _lastAiDiagnosis!['flockBehaviorSummary'] ?? '',
+                      style: const TextStyle(fontSize: 13, height: 1.3),
+                    ),
+                    if (_lastAiDiagnosis!['environmentalCorrelation'] != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _lastAiDiagnosis!['environmentalCorrelation'].toString(),
+                                style: const TextStyle(fontSize: 11, color: Colors.black87),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_lastAiDiagnosis!['symptoms'] != null && (_lastAiDiagnosis!['symptoms'] as List).isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        locale.isFrench ? 'Signes observés :' : 'Observed signs:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: (_lastAiDiagnosis!['symptoms'] as List).map<Widget>((s) {
+                          return Chip(
+                            label: Text(s.toString(), style: const TextStyle(fontSize: 10)),
+                            backgroundColor: Colors.grey.shade200,
+                            padding: EdgeInsets.zero,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                    if (_lastAiDiagnosis!['recommendedActions'] != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        locale.isFrench ? 'Actions Recommandées :' : 'Recommended Actions:',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const SizedBox(height: 4),
+                      ...(_lastAiDiagnosis!['recommendedActions'] as List).map((a) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text('• $a', style: const TextStyle(fontSize: 12)),
+                        );
+                      }),
+                    ],
+                    const SizedBox(height: 12),
+                    // Quick Action Trigger based on diagnosis
+                    if (_devices.isNotEmpty) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            final devId = _devices.first['id'];
+                            final anomaly = (_lastAiDiagnosis!['abnormalityDetected'] ?? '').toString().toLowerCase();
+                            if (anomaly.contains('overcrowd') || anomaly.contains('heat') || anomaly.contains('densit')) {
+                              _triggerManualOverride(devId, 'FAN_ON');
+                            } else if (anomaly.contains('cold')) {
+                              _triggerManualOverride(devId, 'HEATER_ON');
+                            } else {
+                              _triggerManualOverride(devId, 'FEEDER_ON');
+                            }
+                          },
+                          icon: const Icon(Icons.bolt, size: 16),
+                          label: Text(
+                            locale.isFrench
+                                ? 'Exécuter l\'action corrective recommandée'
+                                : 'Trigger Recommended Corrective Actuator',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE67E22),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // 5. Past AI Alert History Feed
+          Row(
+            children: [
+              const Icon(Icons.history, size: 18, color: Colors.grey),
+              const SizedBox(width: 6),
+              Text(
+                locale.isFrench ? 'Historique des Alertes Sanitaires :' : 'Past AI Flock Alerts:',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
           if (aiNotifs.isEmpty)
             Card(
               elevation: 0,
               color: Colors.green.shade50,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
-                    const SizedBox(height: 12),
+                    const Icon(Icons.check_circle_outline, color: Colors.green, size: 40),
+                    const SizedBox(height: 8),
                     Text(
                       locale.isFrench ? 'Tout va bien dans vos élevages !' : 'All Flocks Healthy!',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       locale.isFrench
-                          ? 'Aucune anomalie sanitaire détectée par le modèle IA.'
-                          : 'No health anomalies or disease risk detected by the AI monitoring system.',
+                          ? 'Aucune alerte critique enregistrée récemment.'
+                          : 'No critical alerts or disease risk detected.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                      style: const TextStyle(fontSize: 12, color: Colors.black87),
                     ),
                   ],
                 ),
@@ -2418,16 +3550,32 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             ...aiNotifs.map((item) {
               return Card(
                 color: Colors.red.shade50,
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.red.shade200)),
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.red.shade200),
+                ),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => _showAlertDetailsDialog(item),
                   child: ListTile(
-                    leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.warning, color: Colors.white)),
-                    title: Text(item['title'] ?? 'AI Health Alert', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(item['message'] ?? ''),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.red),
+                    dense: true,
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.red,
+                      radius: 16,
+                      child: Icon(Icons.warning, color: Colors.white, size: 16),
+                    ),
+                    title: Text(
+                      item['title'] ?? 'AI Health Alert',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    subtitle: Text(
+                      item['message'] ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.red, size: 18),
                   ),
                 ),
               );
