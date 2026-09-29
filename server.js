@@ -3,9 +3,17 @@ const express = require('express');
 
 const app = express();
 const publicDir = path.join(__dirname, 'BACK END', 'public');
+const RAILWAY_BACKEND = 'https://my-project-production-f607.up.railway.app';
 
+// Forward API and upload requests directly to central Railway backend
+app.use(['/api', '/uploads'], (req, res) => {
+  res.redirect(307, `${RAILWAY_BACKEND}${req.originalUrl}`);
+});
+
+// Serve static assets from public folder
 app.use(express.static(publicDir));
 
+// Fallback to index.html for Flutter Web SPA client-side routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
