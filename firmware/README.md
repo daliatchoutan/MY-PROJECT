@@ -42,8 +42,12 @@ Recommended setup using a standard ESP32-WROOM / ESP32-38Pin development board f
 | | VCC / GND | 5V / GND | Relay Power (Use external 5V/12V for pump power) |
 | **Food Supply Servo Motor** | PWM Signal | `GPIO 18` | Servo Yellow/Orange Signal Wire |
 | | VCC / GND | 5V / GND | Servo Red (5V) & Brown/Black (GND) |
-| **Heating Lamp Relay (Relay 2)**| Signal Control | `GPIO 27` | Relay Module IN2 Pin |
-| | VCC / GND | 5V / GND | Relay Power (Controls 220V/110V AC Lamp Circuit) |
+| **Heating Output / Relay 2 / LED**| Signal / Output | `GPIO 27` | LED Anode (+) via 220Ω resistor or Relay Module IN2 Pin |
+| | GND | GND | LED Cathode (-) to GND or Relay GND |
+| **DHT Temp & Humidity Sensor** | Data Signal | `GPIO 16` | DHT module `OUT` or `Data` Pin |
+| | VCC / GND | 3.3V / GND | DHT `+` to 3.3V, `-` to GND |
+| **I2C OLED Display (4-Pin)** | SDA / SCL Data | `GPIO 21` / `GPIO 22` | OLED `SDA` to `GPIO 21`, `SCL` to `GPIO 22` |
+| | VCC / GND | 3.3V / GND | OLED `VCC` to 3.3V, `GND` to GND |
 | **Wi-Fi Reset Button** | Tactile Switch | `GPIO 4` | Connected to GND (Pulls LOW to reset Wi-Fi) |
 
 ---
@@ -79,9 +83,12 @@ If running both camera streaming and actuators on a single ESP32-CAM board:
    `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
 3. Install **ESP32** by Espressif Systems in Board Manager.
 4. Install required Arduino Libraries from Library Manager:
-   - `ESP32Servo` (by Kevin Harrington) - for servo motor control.
-   - `ArduinoJson` (by Benoit Blanchon) - for telemetry reporting.
-   - `WiFiManager` (by tzapu) - for captive portal Wi-Fi configuration.
+   - `DHT sensor library` (by Adafruit)
+   - `Adafruit Unified Sensor` (by Adafruit)
+   - `Adafruit SSD1306` (by Adafruit)
+   - `Adafruit GFX Library` (by Adafruit)
+   - `ESP32Servo` (by Kevin Harrington)
+   - `ArduinoJson` (by Benoit Blanchon)
 
 ---
 
