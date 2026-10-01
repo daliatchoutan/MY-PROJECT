@@ -62,7 +62,7 @@ const getDefaultBackendImage = (category, name) => {
 
 const createProduct = async (req, res, next) => {
   try {
-    const { farmId, name, description, price, stockQuantity, unit, category, imageUrl, imageBase64 } = req.body;
+    const { farmId, name, description, price, stockQuantity, unit, category, imageUrl, imageBase64, isAvailable } = req.body;
 
     if (!farmId || !name || price === undefined) {
       return res.status(400).json({ message: 'farmId, name, and price are required.' });
@@ -90,12 +90,14 @@ const createProduct = async (req, res, next) => {
       name,
       description,
       price,
-      stockQuantity: stockQuantity || 0,
+      stockQuantity: (stockQuantity !== undefined && stockQuantity !== null) ? parseInt(stockQuantity) : 100,
       unit: unit || 'unit',
       category: category || 'Live Poultry',
-      imageUrl: finalImageUrl
+      imageUrl: finalImageUrl,
+      isAvailable: isAvailable !== undefined ? (isAvailable === true || isAvailable === 'true' || isAvailable === 1) : true
     });
 
+    console.log(`📦 New Product Created: '${product.name}' (ID: ${product.id}) for Farm '${farm.name}' (isAvailable: ${product.isAvailable})`);
     return res.status(201).json({ message: 'Product added successfully', product });
   } catch (error) {
     next(error);
@@ -104,8 +106,17 @@ const createProduct = async (req, res, next) => {
 
 const getProducts = async (req, res, next) => {
   try {
-    const { search, category, farmId, minPrice, maxPrice } = req.query;
-    let whereClause = { isAvailable: true };
+    const { search, category, farmId, minPrice, maxPrice, includeUnavailable } = req.query;
+    let whereClause = {};
+
+    // Ensure all available products are returned reliably
+    if (includeUnavailable !== 'true') {
+      whereClause[Op.or] = [
+        { isAvailable: true },
+        { isAvailable: 1 },
+        { isAvailable: null }
+      ];
+    }
 
     if (farmId) whereClause.farmId = farmId;
     if (category && category !== 'All') {
@@ -133,7 +144,8 @@ const getProducts = async (req, res, next) => {
 
     const products = await Product.findAll({
       where: whereClause,
-      include: [{ model: Farm, as: 'farm', attributes: ['id', 'name', 'location'] }]
+      include: [{ model: Farm, as: 'farm', attributes: ['id', 'name', 'location'] }],
+      order: [['createdAt', 'DESC']]
     });
 
     return res.json({ products });
