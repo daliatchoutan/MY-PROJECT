@@ -66,9 +66,9 @@ app.use('/api/manager', managerRoutes);
 app.get('/api/app/version', (req, res) => {
   const versionInfo = {
     appName: 'NOVARA Smart Poultry Farm',
-    version: '1.0.2',
-    buildNumber: 3,
-    releaseNotes: '• Resolved Android photo upload & camera permissions in APK\n• Added Farm Manager operational role & multi-tier governance\n• Live stock tracking & out-of-stock alternative recommendations\n• Updated Pinterest-grade feed photography\n• Automated in-app update system',
+    version: '1.0.3',
+    buildNumber: 4,
+    releaseNotes: '• Direct quick logins with dual-password recovery\n• Complete real-time delivery acceptance and live customer order tracking\n• Seamless defense evaluation and testing mode\n• Performance optimizations and bug fixes',
     apkDownloadUrl: `${req.protocol}://${req.get('host')}/download/novara-latest.apk`,
     webAppUrl: 'https://novara-poultry.netlify.app/',
     forceUpdate: false,
