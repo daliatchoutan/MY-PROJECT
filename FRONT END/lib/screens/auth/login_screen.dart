@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     {
       'name': 'Tim (Farmer)',
       'email': 'tim@gmail.com',
-      'password': 'password123',
+      'password': '11111111',
       'role': 'Farmer',
       'icon': Icons.agriculture_rounded,
       'color': Color(0xFF0D7A57),
@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
     {
       'name': 'Dev (Courier)',
       'email': 'dev@gmail.com',
-      'password': 'password123',
+      'password': '11111111',
       'role': 'Delivery Person',
       'icon': Icons.delivery_dining_rounded,
       'color': Color(0xFFE67E22),
