@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,10 +30,87 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _savedName;
   String? _savedRole;
 
+  // Academic Defense & Testing Quick Logins (Hidden on deployed production unless unlocked)
+  bool _showDefenseQuickLogins = false;
+  int _logoTapCounter = 0;
+
+  final List<Map<String, dynamic>> _defenseAccounts = const [
+    {
+      'name': 'Dalia (Admin)',
+      'email': 'Dalia0@gmail.com',
+      'password': 'password123',
+      'role': 'Administrator',
+      'icon': Icons.admin_panel_settings_rounded,
+      'color': Color(0xFF8E1B1B),
+    },
+    {
+      'name': 'Tim (Farmer)',
+      'email': 'tim@gmail.com',
+      'password': 'password123',
+      'role': 'Farmer',
+      'icon': Icons.agriculture_rounded,
+      'color': Color(0xFF0D7A57),
+    },
+    {
+      'name': 'Dev (Courier)',
+      'email': 'dev@gmail.com',
+      'password': 'password123',
+      'role': 'Delivery Person',
+      'icon': Icons.delivery_dining_rounded,
+      'color': Color(0xFFE67E22),
+    },
+    {
+      'name': 'Manager (Farm Mgr)',
+      'email': 'manager@gmail.com',
+      'password': 'password123',
+      'role': 'Farm Manager',
+      'icon': Icons.manage_accounts_rounded,
+      'color': Color(0xFF00796B),
+    },
+    {
+      'name': 'Fav (Customer)',
+      'email': 'fav@gmail.com',
+      'password': 'password123',
+      'role': 'Customer',
+      'icon': Icons.shopping_bag_rounded,
+      'color': Color(0xFF1E88E5),
+    },
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadSavedAccount();
+    if (kDebugMode) {
+      _showDefenseQuickLogins = true;
+    }
+    if (kIsWeb) {
+      final uri = Uri.base;
+      if (uri.queryParameters.containsKey('defense') || uri.queryParameters.containsKey('test')) {
+        _showDefenseQuickLogins = true;
+      }
+    }
+  }
+
+  void _handleLogoTap() {
+    _logoTapCounter++;
+    if (_logoTapCounter >= 3) {
+      _logoTapCounter = 0;
+      setState(() {
+        _showDefenseQuickLogins = !_showDefenseQuickLogins;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _showDefenseQuickLogins
+                ? '🎓 Academic Defense & Testing quick logins unlocked'
+                : 'Defense quick logins hidden',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF0D7A57),
+        ),
+      );
+    }
   }
 
   Future<void> _loadSavedAccount() async {
@@ -99,6 +177,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _quickLogin(String email, String password) async {
+    setState(() {
+      _emailController.text = email;
+      _passwordController.text = password;
+    });
+
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -112,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text(auth.error ?? 'Login failed'),
+          content: Text(auth.error ?? 'Login failed for $email'),
           backgroundColor: Colors.red,
         ),
       );
@@ -166,31 +249,40 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo
+                  // Logo (Tap 3 times to unlock Academic Defense & Testing quick logins on deployed web)
                   Center(
-                    child: Container(
-                      width: 90,
-                      height: 90,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 4)),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset('assets/images/novara_logo.jpg', fit: BoxFit.cover),
+                    child: Tooltip(
+                      message: 'NOVARA Smart Poultry Platform',
+                      child: GestureDetector(
+                        onTap: _handleLogoTap,
+                        child: Container(
+                          width: 90,
+                          height: 90,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 4)),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Image.asset('assets/images/novara_logo.jpg', fit: BoxFit.cover),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'NOVARA',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0D7A57),
-                      letterSpacing: 2.5,
+                  GestureDetector(
+                    onTap: _handleLogoTap,
+                    child: const Text(
+                      'NOVARA',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0D7A57),
+                        letterSpacing: 2.5,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -199,7 +291,121 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.grey, fontSize: 13),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // Academic Defense & Testing Quick Logins (Hidden on deployed version unless unlocked)
+                  if (_showDefenseQuickLogins) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.school_rounded, size: 20, color: Color(0xFFB45309)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  locale.isFrench
+                                      ? '🎓 Soutenance & Mode Test (1-Clic)'
+                                      : '🎓 Project Defense & Testing Logins (1-Tap)',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => setState(() => _showDefenseQuickLogins = false),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(Icons.close_rounded, size: 18, color: Colors.black54),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            locale.isFrench
+                                ? 'Comptes enregistrés pour l\'évaluation et la démonstration :'
+                                : 'Pre-registered accounts for defense evaluation & testing:',
+                            style: const TextStyle(fontSize: 11, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _defenseAccounts.map((account) {
+                              final color = account['color'] as Color;
+                              return Material(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                elevation: 1,
+                                child: InkWell(
+                                  onTap: auth.isLoading
+                                      ? null
+                                      : () => _quickLogin(account['email'], account['password']),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 12,
+                                          backgroundColor: color.withValues(alpha: 0.15),
+                                          child: Icon(account['icon'] as IconData, size: 14, color: color),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              account['name'],
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: color,
+                                              ),
+                                            ),
+                                            Text(
+                                              account['email'],
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   // Quick One-Tap Account Recovery Card
                   if (_savedEmail != null && _savedPassword != null) ...[

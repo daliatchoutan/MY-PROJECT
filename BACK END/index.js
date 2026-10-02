@@ -150,6 +150,58 @@ app.all('/api/setup-admin', async (req, res) => {
   }
 });
 
+// Dedicated Endpoint to Ensure Academic Defense & Testing Users Exist
+app.all('/api/setup-test-users', async (req, res) => {
+  try {
+    const { User, Farm } = require('./src/models');
+    const defenseUsers = [
+      { name: 'dalia', email: 'Dalia0@gmail.com', role: 'Administrator', password: 'password123', status: 'active', phone: '+237 670 000 001' },
+      { name: 'tim', email: 'tim@gmail.com', role: 'Farmer', password: 'password123', status: 'active', phone: '+237 670 000 002' },
+      { name: 'dev', email: 'dev@gmail.com', role: 'Delivery Person', password: 'password123', status: 'active', phone: '+237 670 000 003' },
+      { name: 'manager', email: 'manager@gmail.com', role: 'Farm Manager', password: 'password123', status: 'active', phone: '+237 670 000 004' },
+      { name: 'fav', email: 'fav@gmail.com', role: 'Customer', password: 'password123', status: 'active', phone: '+237 670 000 005' },
+    ];
+
+    const results = [];
+    for (const du of defenseUsers) {
+      let u = await User.findOne({ where: { email: du.email } });
+      if (!u) {
+        u = await User.create(du);
+        results.push({ email: du.email, role: du.role, action: 'created' });
+      } else {
+        u.name = du.name;
+        u.role = du.role;
+        u.status = 'active';
+        u.password = du.password;
+        await u.save();
+        results.push({ email: du.email, role: du.role, action: 'updated' });
+      }
+
+      if (du.role === 'Farmer') {
+        let farm = await Farm.findOne({ where: { farmerId: u.id } });
+        if (!farm) {
+          await Farm.create({
+            name: "Tim's Modern Poultry Farm",
+            location: 'Yaoundé - Obala Agro-Hub',
+            capacity: 4000,
+            currentPoultryCount: 1500,
+            flockType: 'Broilers',
+            farmerId: u.id,
+            status: 'approved'
+          });
+        }
+      }
+    }
+
+    return res.json({
+      message: 'Defense and test users verified and ready.',
+      users: results
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // 404 Handler for undefined API routes
 app.use((req, res, next) => {
   res.status(404).json({ message: `Route '${req.originalUrl}' not found.` });
@@ -181,7 +233,7 @@ const initDatabase = async () => {
 
     // Ensure requested Administrator 'Ben' exists with active status and role Administrator
     try {
-      const { User } = require('./src/models');
+      const { User, Farm } = require('./src/models');
       const adminEmail = 'ben@gmail.com';
       let admin = await User.findOne({ where: { email: adminEmail } });
       if (!admin) {
@@ -202,6 +254,48 @@ const initDatabase = async () => {
         await admin.save();
         console.log(` Administrator 'Ben' (${adminEmail}) verified and updated with active role.`);
       }
+
+      // Ensure testing and project defense users exist with active status and reliable test passwords
+      const defenseUsers = [
+        { name: 'dalia', email: 'Dalia0@gmail.com', role: 'Administrator', password: 'password123', status: 'active', phone: '+237 670 000 001' },
+        { name: 'tim', email: 'tim@gmail.com', role: 'Farmer', password: 'password123', status: 'active', phone: '+237 670 000 002' },
+        { name: 'dev', email: 'dev@gmail.com', role: 'Delivery Person', password: 'password123', status: 'active', phone: '+237 670 000 003' },
+        { name: 'manager', email: 'manager@gmail.com', role: 'Farm Manager', password: 'password123', status: 'active', phone: '+237 670 000 004' },
+        { name: 'fav', email: 'fav@gmail.com', role: 'Customer', password: 'password123', status: 'active', phone: '+237 670 000 005' },
+      ];
+
+      for (const du of defenseUsers) {
+        let u = await User.findOne({ where: { email: du.email } });
+        if (!u) {
+          u = await User.create(du);
+          console.log(` Created defense/test user '${du.name}' (${du.email}) [${du.role}].`);
+        } else {
+          u.name = du.name;
+          u.role = du.role;
+          u.status = 'active';
+          u.password = du.password;
+          await u.save();
+          console.log(` Verified defense/test user '${du.name}' (${du.email}) [${du.role}].`);
+        }
+
+        if (du.role === 'Farmer') {
+          let farm = await Farm.findOne({ where: { farmerId: u.id } });
+          if (!farm) {
+            await Farm.create({
+              name: "Tim's Modern Poultry Farm",
+              location: 'Yaoundé - Obala Agro-Hub',
+              capacity: 4000,
+              currentPoultryCount: 1500,
+              flockType: 'Broilers',
+              farmerId: u.id,
+              status: 'approved'
+            });
+          }
+        }
+      }
+    } catch (defenseErr) {
+      console.warn('Notice setting up defense users:', defenseErr.message);
+    }
 
       // Ensure default farm and initial products exist if catalog is empty
       const { Farm, Product } = require('./src/models');
