@@ -14,7 +14,7 @@ const isConfigured = () => {
 };
 
 const getModelName = () => {
-  return process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  return process.env.GEMINI_MODEL || 'gemini-flash-latest';
 };
 
 /**
@@ -126,8 +126,13 @@ You MUST respond with ONLY a valid, raw JSON object (no markdown fences, no expl
       return generateFallbackAnalysis({ sensorData, farmName, flockType, error: 'Empty response from Gemini' });
     }
 
-    // Parse the JSON output
-    const cleanJson = candidateText.trim().replace(/^```json/i, '').replace(/```$/i, '').trim();
+    // Parse the JSON output safely
+    const firstBrace = candidateText.indexOf('{');
+    const lastBrace = candidateText.lastIndexOf('}');
+    let cleanJson = candidateText.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleanJson = candidateText.substring(firstBrace, lastBrace + 1);
+    }
     const parsed = JSON.parse(cleanJson);
 
     return {

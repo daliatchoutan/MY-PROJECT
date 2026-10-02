@@ -611,7 +611,7 @@ class _CustomerDashboardState extends State<CustomerDashboard>
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                value: selectedMethod,
+                initialValue: selectedMethod,
                 decoration: InputDecoration(
                   labelText: locale.isFrench ? 'Canal de paiement' : 'Payment Channel',
                   border: const OutlineInputBorder(),

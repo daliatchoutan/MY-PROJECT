@@ -127,7 +127,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
             children: [
               if (isManager && _managedFarmers.isNotEmpty) ...[
                 DropdownButtonFormField<String?>(
-                  value: selectedFarmerId,
+                  initialValue: selectedFarmerId,
                   items: [
                     DropdownMenuItem<String?>(
                       value: null,
@@ -1553,7 +1553,7 @@ class _FarmerDashboardState extends State<FarmerDashboard> with SingleTickerProv
                   const SizedBox(height: 12),
                   if (_farms.isNotEmpty) ...[
                     DropdownButtonFormField<String>(
-                      value: selectedFarmId,
+                      initialValue: selectedFarmId,
                       decoration: InputDecoration(
                         labelText: locale.isFrench ? 'Ferme cible' : 'Target Farm',
                         border: const OutlineInputBorder(),

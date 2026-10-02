@@ -12878,8 +12878,8 @@ _.w=h
 _.x=i},
 YT:function YT(){},
 hz(a,b,c){return new A.fk(b,a,B.dE,null,c.i("fk<0>"))},
-iH(a,b,c,d,e,f){var s=null,r=b==null?e:b
-return new A.wq(d,new A.aae(f,a,c,d,s,s,s,s,s,8,s,s,s,s,24,!0,!1,s,s,s,!1,s,s,s,B.dE,s,s,!0,s,s),s,s,r,!0,B.j2,s,s,f.i("wq<0>"))},
+iH(a,b,c,d,e){var s=null,r=b==null?s:b
+return new A.wq(d,new A.aae(e,a,c,d,s,s,s,s,s,8,s,s,s,s,24,!0,!1,s,s,s,!1,s,s,s,B.dE,s,s,!0,s,s),s,s,r,!0,B.j2,s,s,e.i("wq<0>"))},
 YU:function YU(a,b,c,d,e,f,g,h){var _=this
 _.b=a
 _.c=b
@@ -105495,7 +105495,7 @@ I(a){var s,r=this,q="create_account",p=null,o="phone_number",n=A.aC(a,!0,t.d),m=
 e=A.Z(new A.a6(e,new A.aHV(m),d),d.i("ap.E"))
 d=t.N
 s=t.p
-e=A.b([k,B.av,j,B.aY,i,B.az,h,B.b2,A.iH(f,g,e,new A.aHW(r),p,d),B.av],s)
+e=A.b([k,B.av,j,B.aY,i,B.az,h,B.b2,A.iH(f,g,e,new A.aHW(r),d),B.av],s)
 k=r.cx
 if(k==="Farmer"){k=A.az(8)
 B.b.L(e,A.b([A.aS(p,B.ZK,B.o,p,p,new A.aL(B.bT,p,A.cr(B.f9,1),k,p,p,B.z),p,p,p,B.bI,p,p,p),B.av],s))}else if(k==="Farm Manager"){k=A.az(8)
@@ -105524,7 +105524,7 @@ i=r.ay
 h=r.db
 g=A.a5(h).i("a6<1,fk<w>>")
 h=A.Z(new A.a6(h,new A.aI6(),g),g.i("ap.E"))
-k=A.b([k,B.av,j,B.av,A.iH(B.Rf,i,h,new A.aHY(r),p,d),B.av],s)
+k=A.b([k,B.av,j,B.av,A.iH(B.Rf,i,h,new A.aHY(r),d),B.av],s)
 if(r.ay!=="Walking / On Foot")B.b.L(k,A.b([A.hn(r.ax,B.Ra,p,1,!1,p),B.av],s))
 B.b.L(e,k)}if(r.cx==="Customer")B.b.L(e,A.b([A.hn(r.z,A.ci(p,B.af,p,p,p,p,p,p,!0,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,p,A.b3("delivery_address",m.a),!0,!0,!1,p,B.o2,p,p,p,p,p,p,p,p,p,p,p,p),p,1,!1,p),B.av],s))
 e.push(B.bb)
@@ -105800,7 +105800,7 @@ r=n.d
 q=n.e
 p=n.f
 o=t.p
-j=A.ii(A.aO(A.b([A.iH(B.uD,k,j,new A.auy(l),m,t.N),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),s,m,m,m,m,m,2,B.uB,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),r,m,m,m,m,m,2,B.uA,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),q,m,m,m,m,m,2,B.Ri,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),p,m,m,m,m,m,2,B.uC,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m)],o),B.m,B.i,B.V),m,B.w,m,m,B.W)
+j=A.ii(A.aO(A.b([A.iH(B.uD,k,j,new A.auy(l),t.N),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),s,m,m,m,m,m,2,B.uB,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),r,m,m,m,m,m,2,B.uA,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),q,m,m,m,m,m,2,B.Ri,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m),A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),p,m,m,m,m,m,2,B.uC,B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,m,m,m,m,1,m,m,!1,"\u2022",m,m,m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m)],o),B.m,B.i,B.V),m,B.w,m,m,B.W)
 return A.dB(A.b([A.cZ(B.dZ,new A.auz(a),m),A.dj(B.a7R,new A.auA(l,n.b,s,r,q,p,a),m)],o),j,m,m,B.a7y,m)},
 $S:13}
 A.aux.prototype={
@@ -105837,7 +105837,7 @@ s=o.d
 r=o.e
 q=o.f
 p=t.p
-i=A.ii(A.aO(A.b([A.iH(B.uD,j,i,new A.auD(k),n,t.N),A.co(n,B.a_,!1,n,!0,B.k,n,A.cy(),s,n,n,n,n,n,2,B.uB,B.w,!0,n,!0,n,!1,n,B.a1,n,n,n,n,n,n,n,n,1,n,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,n,!0,B.K,n,B.a6,n,n,n,n),A.co(n,B.a_,!1,n,!0,B.k,n,A.cy(),r,n,n,n,n,n,2,B.uA,B.w,!0,n,!0,n,!1,n,B.a1,n,n,n,n,n,n,n,n,1,n,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,n,!0,B.K,n,B.a6,n,n,n,n),A.co(n,B.a_,!1,n,!0,B.k,n,A.cy(),q,n,n,n,n,n,2,B.uC,B.w,!0,n,!0,n,!1,n,B.a1,n,n,n,n,n,n,n,n,1,n,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,n,!0,B.K,n,B.a6,n,n,n,n)],p),B.m,B.i,B.V),n,B.w,n,n,B.W)
+i=A.ii(A.aO(A.b([A.iH(B.uD,j,i,new A.auD(k),t.N),A.co(n,B.a_,!1,n,!0,B.k,n,A.cy(),s,n,n,n,n,n,2,B.uB,B.w,!0,n,!0,n,!1,n,B.a1,n,n,n,n,n,n,n,n,1,n,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,n,!0,B.K,n,B.a6,n,n,n,n),A.co(n,B.a_,!1,n,!0,B.k,n,A.cy(),r,n,n,n,n,n,2,B.uA,B.w,!0,n,!0,n,!1,n,B.a1,n,n,n,n,n,n,n,n,1,n,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,n,!0,B.K,n,B.a6,n,n,n,n),A.co(n,B.a_,!1,n,!0,B.k,n,A.cy(),q,n,n,n,n,n,2,B.uC,B.w,!0,n,!0,n,!1,n,B.a1,n,n,n,n,n,n,n,n,1,n,n,!1,"\u2022",n,n,n,n,n,!1,n,n,!1,n,!0,n,B.Z,n,n,n,n,n,n,n,n,n,n,n,n,!0,B.K,n,B.a6,n,n,n,n)],p),B.m,B.i,B.V),n,B.w,n,n,B.W)
 return A.dB(A.b([A.cZ(B.dZ,new A.auE(a),n),A.dj(B.FU,new A.auF(k,o.b,m,s,r,q,a),n)],p),i,n,n,l,n)},
 $S:13}
 A.auC.prototype={
@@ -106474,15 +106474,15 @@ q=A.ci(m,B.af,m,m,m,m,m,m,!0,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m
 p=t.fo
 p=A.Z(new A.a6(A.b(["MTN Mobile Money","Orange Money"],t.s),new A.ayb(),p),p.i("ap.E"))
 o=s.b?m:new A.ayc(s,b)
-r=A.iH(q,m,p,o,r,t.N)
-o=n.e
-q=l.a==="fr"
-p=q?"Num\xe9ro Mobile Money (Push USSD)":"Phone for Mobile Money Push"
-h=A.aO(A.b([h,B.az,g,B.av,r,B.az,A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),o,m,m,m,m,m,2,A.ci(m,B.af,m,m,m,m,m,m,!0,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,q?"Un prompt de validation USSD sera envoy\xe9 sur ce num\xe9ro":"A USSD confirmation prompt will be sent to this number",m,m,m,m,"Ex: 6XX XXX XXX ou +237 6XX...",m,m,m,m,m,m,m,m,p,!0,!0,!1,m,B.PD,m,m,m,m,m,m,m,m,m,m,m,m),B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,B.lf,m,m,m,1,m,m,!1,"\u2022",m,new A.ayd(s,n.f,b),m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m)],k),B.E,B.i,B.V)
+o=A.iH(q,r,p,o,t.N)
+p=n.e
+r=l.a==="fr"
+q=r?"Num\xe9ro Mobile Money (Push USSD)":"Phone for Mobile Money Push"
+h=A.aO(A.b([h,B.az,g,B.av,o,B.az,A.co(m,B.a_,!1,m,!0,B.k,m,A.cy(),p,m,m,m,m,m,2,A.ci(m,B.af,m,m,m,m,m,m,!0,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,m,r?"Un prompt de validation USSD sera envoy\xe9 sur ce num\xe9ro":"A USSD confirmation prompt will be sent to this number",m,m,m,m,"Ex: 6XX XXX XXX ou +237 6XX...",m,m,m,m,m,m,m,m,q,!0,!0,!1,m,B.PD,m,m,m,m,m,m,m,m,m,m,m,m),B.w,!0,m,!0,m,!1,m,B.a1,m,m,m,m,B.lf,m,m,m,1,m,m,!1,"\u2022",m,new A.ayd(s,n.f,b),m,m,m,!1,m,m,!1,m,!0,m,B.Z,m,m,m,m,m,m,m,m,m,m,m,m,!0,B.K,m,B.a6,m,m,m,m)],k),B.E,B.i,B.V)
 g=s.b
 r=g?m:new A.aye(a)
 r=A.cZ(A.i(l.a==="fr"?"Payer plus tard":"Pay Later",m,m,m,m,m,m,m),r,m)
-i=g?m:new A.ayf(s,n.b,o,a,l,b,n.r,n.w,i)
+i=g?m:new A.ayf(s,n.b,p,a,l,b,n.r,n.w,i)
 g=A.bS(m,m,B.p,m,m,m,m,m,m,B.f,m,m,m,m,m,m,m,m,m,m)
 if(s.b)l=B.fY
 else{s=A.i(l.a==="fr"?"Valider et payer":"Confirm & Pay",m,m,m,m,m,m,m)
@@ -108120,7 +108120,7 @@ r=s.a
 q=t.ob
 p=A.b([A.hz(A.i(k.a==="fr"?"Moi-m\xeame (Chef d'exploitation)":"Myself (Farm Manager)",l,l,l,l,l,l,l),l,q)],t.oD)
 B.b.L(p,J.em(m.b.z,new A.aB2(),t.k9))
-B.b.L(h,A.b([A.iH(A.ci(l,l,l,l,l,l,l,l,!0,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,k.a==="fr"?"Attribuer \xe0 l'\xe9leveur":"Assign to Farmer",!0,!0,!1,l,B.o3,l,l,l,l,l,l,l,l,l,l,l,l),l,p,new A.aB3(s,b),r,q),B.az],i))}s=m.e
+B.b.L(h,A.b([A.iH(A.ci(l,l,l,l,l,l,l,l,!0,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,k.a==="fr"?"Attribuer \xe0 l'\xe9leveur":"Assign to Farmer",!0,!0,!1,l,B.o3,l,l,l,l,l,l,l,l,l,l,l,l),r,p,new A.aB3(s,b),q),B.az],i))}s=m.e
 h.push(A.co(l,B.a_,!1,l,!0,B.k,l,A.cy(),s,l,l,l,l,l,2,A.ci(l,l,l,l,l,l,l,l,!0,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,"e.g. Green Valley Farm",l,l,l,l,l,l,l,l,k.a==="fr"?"Nom de la Ferme *":"Farm Name *",!0,!0,!1,l,l,l,l,l,l,l,l,l,l,l,l,l,l),B.w,!0,l,!0,l,!1,l,B.a1,l,l,l,l,l,l,l,l,1,l,l,!1,"\u2022",l,l,l,l,l,!1,l,l,!1,l,!0,l,B.Z,l,l,l,l,l,l,l,l,l,l,l,l,!0,B.K,l,B.a6,l,l,l,l))
 r=m.f
 h.push(A.co(l,B.a_,!1,l,!0,B.k,l,A.cy(),r,l,l,l,l,l,2,A.ci(l,l,l,l,l,l,l,l,!0,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,l,"e.g. Yaounde, Obala",l,l,l,l,l,l,l,l,k.a==="fr"?"Localisation / R\xe9gion *":"Location / Region *",!0,!0,!1,l,l,l,l,l,l,l,l,l,l,l,l,l,l),B.w,!0,l,!0,l,!1,l,B.a1,l,l,l,l,l,l,l,l,1,l,l,!1,"\u2022",l,l,l,l,l,!1,l,l,!1,l,!0,l,B.Z,l,l,l,l,l,l,l,l,l,l,l,l,!0,B.K,l,B.a6,l,l,l,l))
@@ -108204,7 +108204,7 @@ k=A.Z(k,k.$ti.i("ap.E"))
 s=p.c
 r=p.d
 q=t.p
-k=A.aO(A.b([A.iH(B.R9,m,k,new A.aAW(n),o,t.N),A.co(o,B.a_,!1,o,!0,B.k,o,A.cy(),s,o,o,o,o,o,2,B.Rl,B.w,!0,o,!0,o,!1,o,B.a1,o,o,o,o,o,o,o,o,1,o,o,!1,"\u2022",o,o,o,o,o,!1,o,o,!1,o,!0,o,B.Z,o,o,o,o,o,o,o,o,o,o,o,o,!0,B.K,o,B.a6,o,o,o,o),A.co(o,B.a_,!1,o,!0,B.k,o,A.cy(),r,o,o,o,o,o,2,B.Rh,B.w,!0,o,!0,o,!1,o,B.a1,o,o,o,o,o,o,o,o,1,o,o,!1,"\u2022",o,o,o,o,o,!1,o,o,!1,o,!0,o,B.Z,o,o,o,o,o,o,o,o,o,o,o,o,!0,B.K,o,B.a6,o,o,o,o)],q),B.m,B.i,B.V)
+k=A.aO(A.b([A.iH(B.R9,m,k,new A.aAW(n),t.N),A.co(o,B.a_,!1,o,!0,B.k,o,A.cy(),s,o,o,o,o,o,2,B.Rl,B.w,!0,o,!0,o,!1,o,B.a1,o,o,o,o,o,o,o,o,1,o,o,!1,"\u2022",o,o,o,o,o,!1,o,o,!1,o,!0,o,B.Z,o,o,o,o,o,o,o,o,o,o,o,o,!0,B.K,o,B.a6,o,o,o,o),A.co(o,B.a_,!1,o,!0,B.k,o,A.cy(),r,o,o,o,o,o,2,B.Rh,B.w,!0,o,!0,o,!1,o,B.a1,o,o,o,o,o,o,o,o,1,o,o,!1,"\u2022",o,o,o,o,o,!1,o,o,!1,o,!0,o,B.Z,o,o,o,o,o,o,o,o,o,o,o,o,!0,B.K,o,B.a6,o,o,o,o)],q),B.m,B.i,B.V)
 return A.dB(A.b([A.cZ(B.dZ,new A.aAX(a),o),A.dj(B.a7W,new A.aAY(n,l,s,r,a),o)],q),k,o,o,B.a76,o)},
 $S:13}
 A.aAV.prototype={
@@ -108242,14 +108242,14 @@ A.aBt.prototype={
 $2(a5,a6){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c=this,b=null,a=c.c,a0=A.i(a.a==="fr"?"Ajouter un Produit (H\xe9berg\xe9 au Backend)":"Add Product to Marketplace",b,b,b,b,b,b,b),a1=c.a,a2=a1.a,a3=c.b,a4=J.em(a3.e,new A.aBh(),t.b7)
 a4=A.Z(a4,a4.$ti.i("ap.E"))
 s=t.N
-a4=A.iH(A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,a.a==="fr"?"Ferme":"Select Farm",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),a2,a4,new A.aBi(a1,a6),b,s)
+a4=A.iH(A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,a.a==="fr"?"Ferme":"Select Farm",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),a2,a4,new A.aBi(a1,a6),s)
 a2=a1.b
 r=t.s
 q=t.fo
 p=q.i("ap.E")
 o=A.Z(new A.a6(A.b(["Live Poultry","Eggs","Poultry Meat","Poultry Feed"],r),new A.aBj(),q),p)
 n=a.a==="fr"
-a2=A.iH(A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,n?"Cat\xe9gorie":"Category",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),a2,o,new A.aBl(a1,a6),b,s)
+a2=A.iH(A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,n?"Cat\xe9gorie":"Category",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),a2,o,new A.aBl(a1,a6),s)
 o=c.d
 m=A.co(b,B.a_,!1,b,!0,B.k,b,A.cy(),o,b,b,b,b,b,2,A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,"e.g. Broiler Chicken / Poulet de chair",b,b,b,b,b,b,b,b,n?"Nom du Produit":"Product Name",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),B.w,!0,b,!0,b,!1,b,B.a1,b,b,b,b,b,b,b,b,1,b,b,!1,"\u2022",b,b,b,b,b,!1,b,b,!1,b,!0,b,B.Z,b,b,b,b,b,b,b,b,b,b,b,b,!0,B.K,b,B.a6,b,b,b,b)
 l=c.e
@@ -108259,7 +108259,7 @@ j=A.bQ(A.co(b,B.a_,!1,b,!0,B.k,b,A.cy(),k,b,b,b,b,b,2,A.ci(b,b,b,b,b,b,b,b,!0,b,
 i=a1.c
 r=A.Z(new A.a6(A.b(["bird","tray","kg","50kg bag","unit","crate"],r),new A.aBm(),q),p)
 q=t.p
-r=A.aq(A.b([n,B.bV,j,B.bV,A.bQ(A.iH(A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,a.a==="fr"?"Unit\xe9":"Unit",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),i,r,new A.aBn(a1,a6),b,s),2)],q),B.m,B.i,B.l,0)
+r=A.aq(A.b([n,B.bV,j,B.bV,A.bQ(A.iH(A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,a.a==="fr"?"Unit\xe9":"Unit",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),i,r,new A.aBn(a1,a6),s),2)],q),B.m,B.i,B.l,0)
 i=c.r
 p=A.co(b,B.a_,!1,b,!0,B.k,b,A.cy(),i,b,b,b,b,b,2,A.ci(b,b,b,b,b,b,b,b,!0,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,b,"Description",!0,!0,!1,b,b,b,b,b,b,b,b,b,b,b,b,b,b),B.w,!0,b,!0,b,!1,b,B.a1,b,b,b,b,b,b,b,b,1,b,b,!1,"\u2022",b,b,b,b,b,!1,b,b,!1,b,!0,b,B.Z,b,b,b,b,b,b,b,b,b,b,b,b,!0,B.K,b,B.a6,b,b,b,b)
 n=A.i(a.a==="fr"?"Photo du Produit (H\xe9berg\xe9e au Backend)":"Product Image (Backend Upload / Hosting)",b,b,b,b,B.bP,b,b)
@@ -108499,7 +108499,7 @@ return new A.hN(new A.aCc(s.a,s.b,s.c,s.d,s.e,s.f,s.r,a,s.w),null)},
 $S:43}
 A.aCc.prototype={
 $2(a3,a4){var s,r,q,p,o,n,m,l,k,j,i=this,h=null,g=i.c,f=A.i(g.a==="fr"?"Modifier le Produit":"Edit Product",h,h,h,h,h,h,h),e=i.a,d=e.a,c=t.s,b=t.fo,a=b.i("ap.E"),a0=A.Z(new A.a6(A.b(["Live Poultry","Eggs","Poultry Meat","Poultry Feed"],c),new A.aC2(),b),a),a1=g.a==="fr",a2=t.N
-a0=A.iH(A.ci(h,h,h,h,h,h,h,h,!0,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,a1?"Cat\xe9gorie":"Category",!0,!0,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h),d,a0,new A.aC3(e,a4),h,a2)
+a0=A.iH(A.ci(h,h,h,h,h,h,h,h,!0,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,a1?"Cat\xe9gorie":"Category",!0,!0,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h),d,a0,new A.aC3(e,a4),a2)
 d=i.d
 s=A.co(h,B.a_,!1,h,!0,B.k,h,A.cy(),d,h,h,h,h,h,2,A.ci(h,h,h,h,h,h,h,h,!0,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,a1?"Nom du Produit":"Product Name",!0,!0,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h),B.w,!0,h,!0,h,!1,h,B.a1,h,h,h,h,h,h,h,h,1,h,h,!1,"\u2022",h,h,h,h,h,!1,h,h,!1,h,!0,h,B.Z,h,h,h,h,h,h,h,h,h,h,h,h,!0,B.K,h,B.a6,h,h,h,h)
 r=i.e
@@ -108509,7 +108509,7 @@ p=A.bQ(A.co(h,B.a_,!1,h,!0,B.k,h,A.cy(),q,h,h,h,h,h,2,A.ci(h,h,h,h,h,h,h,h,!0,h,
 o=B.b.m(A.b(["bird","tray","kg","50kg bag","unit","crate"],c),e.b)?e.b:"unit"
 c=A.Z(new A.a6(A.b(["bird","tray","kg","50kg bag","unit","crate"],c),new A.aC4(),b),a)
 b=t.p
-c=A.aq(A.b([a1,B.bV,p,B.bV,A.bQ(A.iH(A.ci(h,h,h,h,h,h,h,h,!0,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g.a==="fr"?"Unit\xe9":"Unit",!0,!0,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h),o,c,new A.aC5(e,a4),h,a2),2)],b),B.m,B.i,B.l,0)
+c=A.aq(A.b([a1,B.bV,p,B.bV,A.bQ(A.iH(A.ci(h,h,h,h,h,h,h,h,!0,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,g.a==="fr"?"Unit\xe9":"Unit",!0,!0,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h),o,c,new A.aC5(e,a4),a2),2)],b),B.m,B.i,B.l,0)
 o=i.r
 a=A.co(h,B.a_,!1,h,!0,B.k,h,A.cy(),o,h,h,h,h,h,2,A.ci(h,h,h,h,h,h,h,h,!0,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,h,"Description",!0,!0,!1,h,h,h,h,h,h,h,h,h,h,h,h,h,h),B.w,!0,h,!0,h,!1,h,B.a1,h,h,h,h,h,h,h,h,1,h,h,!1,"\u2022",h,h,h,h,h,!1,h,h,!1,h,!0,h,B.Z,h,h,h,h,h,h,h,h,h,h,h,h,!0,B.K,h,B.a6,h,h,h,h)
 a1=A.i(g.a==="fr"?"Photo du Produit":"Product Image",h,h,h,h,B.bP,h,h)
@@ -108839,7 +108839,7 @@ c=A.ci(o,B.af,o,B.fg,o,o,o,o,!0,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,o,
 a=J.em(e.e,new A.aCt(),t.b7)
 a=A.Z(a,a.$ti.i("ap.E"))
 s=b.e?o:new A.aCu(b,a1)
-B.b.L(f,A.b([A.iH(c,o,a,s,d,t.N),B.az],h))}d=b.f
+B.b.L(f,A.b([A.iH(c,d,a,s,t.N),B.az],h))}d=b.f
 if(d!=null){if(J.c(d.h(0,n),m))d=B.bT
 else d=J.c(b.f.h(0,n),"warning")?B.dK:B.dh
 c=A.az(10)
@@ -109662,7 +109662,7 @@ A.aBH.prototype={
 $2(a,b){var s=this,r=null,q=s.c,p=t.p,o=A.aq(A.b([B.Qz,B.ai,A.bQ(A.i(q.a==="fr"?"Assigner la livraison":"Assign Delivery Courier",r,B.ao,r,r,B.bD,r,r),1)],p),B.m,B.i,B.l,0),n=q.a==="fr",m=A.i(n?"S\xe9lectionnez le livreur. Il recevra une notification instantan\xe9e avec les d\xe9tails de la commande.":"Select a courier. They will receive an instant notification with order details.",r,r,r,r,B.dz,r,r),l=s.a,k=l.b,j=A.ci(r,B.af,r,r,r,r,r,r,!0,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,n?"S\xe9lectionner le livreur":"Select Delivery Person",!0,!0,!1,r,B.Qh,r,r,r,r,r,r,r,r,r,r,r,r),i=J.em(l.a,new A.aBD(),t.b7)
 n=A.Z(i,i.$ti.i("ap.E"))
 i=l.c?r:new A.aBE(l,b)
-i=A.aO(A.b([m,B.b2,A.iH(j,k,n,i,r,t.N)],p),B.E,B.i,B.V)
+i=A.aO(A.b([m,B.b2,A.iH(j,k,n,i,t.N)],p),B.E,B.i,B.V)
 n=l.c
 m=n?r:new A.aBF(a)
 m=A.cZ(A.i(q.a==="fr"?"Annuler":"Cancel",r,r,r,r,r,r,r),m,r)
