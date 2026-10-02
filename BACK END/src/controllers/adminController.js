@@ -192,15 +192,19 @@ const createUser = async (req, res, next) => {
       return res.status(400).json({ message: 'Email is already registered.' });
     }
 
-    const validRoles = ['Administrator', 'Farmer', 'Customer', 'Delivery Person'];
+    const validRoles = ['Administrator', 'Farmer', 'Customer', 'Delivery Person', 'Farm Manager'];
     const assignedRole = validRoles.includes(role) ? role : 'Customer';
 
     let farmerId = null;
     let deliveryPersonId = null;
+    let farmManagerId = null;
     if (assignedRole === 'Farmer') {
       farmerId = await generateFarmerId(User);
     } else if (assignedRole === 'Delivery Person') {
       deliveryPersonId = await generateDeliveryPersonId(User);
+    } else if (assignedRole === 'Farm Manager') {
+      const { generateFarmManagerId } = require('../utils/idGenerator');
+      farmManagerId = await generateFarmManagerId(User);
     }
 
     const user = await User.create({
@@ -211,6 +215,7 @@ const createUser = async (req, res, next) => {
       phone,
       cniNumber: cniNumber || null,
       farmerId,
+      farmManagerId,
       deliveryPersonId,
       vehicleType: vehicleType || null,
       vehiclePlateNumber: vehiclePlateNumber || null,
@@ -246,10 +251,11 @@ const updateUser = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    const { name, email, role, phone, address, avatarUrl } = req.body;
+    const { name, email, role, phone, address, avatarUrl, password } = req.body;
     if (name) user.name = name;
     if (email) user.email = email;
     if (role) user.role = role;
+    if (password) user.password = password;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
     if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
