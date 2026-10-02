@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     {
       'name': 'Tim (Farmer)',
       'email': 'tim@gmail.com',
-      'password': '11111111',
+      'password': 'password123',
       'role': 'Farmer',
       'icon': Icons.agriculture_rounded,
       'color': Color(0xFF0D7A57),
@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
     {
       'name': 'Dev (Courier)',
       'email': 'dev@gmail.com',
-      'password': '11111111',
+      'password': 'password123',
       'role': 'Delivery Person',
       'icon': Icons.delivery_dining_rounded,
       'color': Color(0xFFE67E22),
@@ -293,116 +293,68 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Academic Defense & Testing Quick Logins (Hidden on deployed version unless unlocked)
+                  // Quick Logins (Hidden on deployed version unless unlocked)
                   if (_showDefenseQuickLogins) ...[
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 20),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.12),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.school_rounded, size: 20, color: Color(0xFFB45309)),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  locale.isFrench
-                                      ? '🎓 Soutenance & Mode Test (1-Clic)'
-                                      : '🎓 Project Defense & Testing Logins (1-Tap)',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: Color(0xFFB45309),
-                                  ),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () => setState(() => _showDefenseQuickLogins = false),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(4),
-                                  child: Icon(Icons.close_rounded, size: 18, color: Colors.black54),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            locale.isFrench
-                                ? 'Comptes enregistrés pour l\'évaluation et la démonstration :'
-                                : 'Pre-registered accounts for defense evaluation & testing:',
-                            style: const TextStyle(fontSize: 11, color: Colors.black87),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _defenseAccounts.map((account) {
-                              final color = account['color'] as Color;
-                              return Material(
-                                color: Colors.white,
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Center(
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _defenseAccounts.map((account) {
+                            final color = account['color'] as Color;
+                            return Material(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              elevation: 1.5,
+                              child: InkWell(
+                                onTap: auth.isLoading
+                                    ? null
+                                    : () => _quickLogin(account['email'], account['password']),
                                 borderRadius: BorderRadius.circular(10),
-                                elevation: 1,
-                                child: InkWell(
-                                  onTap: auth.isLoading
-                                      ? null
-                                      : () => _quickLogin(account['email'], account['password']),
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: color.withValues(alpha: 0.3)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 12,
-                                          backgroundColor: color.withValues(alpha: 0.15),
-                                          child: Icon(account['icon'] as IconData, size: 14, color: color),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              account['name'],
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                                color: color,
-                                              ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: color.withValues(alpha: 0.35)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 12,
+                                        backgroundColor: color.withValues(alpha: 0.15),
+                                        child: Icon(account['icon'] as IconData, size: 14, color: color),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            account['name'],
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: color,
                                             ),
-                                            Text(
-                                              account['email'],
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.black54,
-                                              ),
+                                          ),
+                                          Text(
+                                            account['email'],
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.black54,
                                             ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ],
