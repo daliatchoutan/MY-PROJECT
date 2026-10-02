@@ -68,12 +68,14 @@ class _LeafletOrderTrackingModalState extends State<LeafletOrderTrackingModal> {
     // Calculate courier position along route depending on delivery status
     final deliveryStatus = widget.delivery?['status']?.toString().toLowerCase() ?? 'unassigned';
     double progress = 0.15; // default near farm
-    if (deliveryStatus == 'in_transit' || deliveryStatus == 'en_route') {
-      progress = 0.60; // in transit midway
-    } else if (deliveryStatus == 'delivered' || deliveryStatus == 'completed') {
+    if (deliveryStatus == 'delivered' || deliveryStatus == 'completed') {
       progress = 1.0; // at customer
-    } else if (deliveryStatus == 'assigned' || deliveryStatus == 'picked_up') {
-      progress = 0.30;
+    } else if (deliveryStatus == 'in_transit' || deliveryStatus == 'en_route') {
+      progress = 0.70; // en route to customer
+    } else if (deliveryStatus == 'picked_up') {
+      progress = 0.45; // leaving farm with order
+    } else if (deliveryStatus == 'accepted' || deliveryStatus == 'assigned') {
+      progress = 0.25; // courier confirmed & approaching farm
     }
 
     _courierLocation = LatLng(
@@ -150,12 +152,19 @@ class _LeafletOrderTrackingModalState extends State<LeafletOrderTrackingModal> {
       case 'in_transit':
       case 'en_route':
         statusColor = const Color(0xFFE67E22);
-        statusLabel = locale.isFrench ? 'En cours d\'acheminement' : 'In Transit';
+        statusLabel = locale.isFrench ? 'En cours d\'acheminement' : 'In Transit to You';
+        break;
+      case 'picked_up':
+        statusColor = Colors.purple;
+        statusLabel = locale.isFrench ? 'Colis récupéré à la ferme' : 'Picked Up from Farm';
+        break;
+      case 'accepted':
+        statusColor = Colors.blue;
+        statusLabel = locale.isFrench ? 'Livreur en route vers la ferme' : 'Courier Heading to Farm';
         break;
       case 'assigned':
-      case 'picked_up':
         statusColor = Colors.blue;
-        statusLabel = locale.isFrench ? 'Colis pris en charge' : 'Driver Assigned / Picked Up';
+        statusLabel = locale.isFrench ? 'Livreur assigné' : 'Driver Assigned';
         break;
       default:
         statusColor = Colors.grey;

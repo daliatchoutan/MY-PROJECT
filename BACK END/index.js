@@ -297,6 +297,7 @@ const initDatabase = async () => {
       console.warn('Notice setting up defense users:', defenseErr.message);
     }
 
+    try {
       // Ensure default farm and initial products exist if catalog is empty
       const { Farm, Product } = require('./src/models');
       const productCount = await Product.count();
@@ -417,7 +418,7 @@ const initDatabase = async () => {
         console.log(' Default poultry products catalog automatically initialized with live stock.');
       }
     } catch (adminErr) {
-      console.error('Notice ensuring Administrator Ben:', adminErr.message);
+      console.error('Notice ensuring demo catalog:', adminErr.message);
     }
   } catch (error) {
     console.error(' Database initialization notice:', error.message);

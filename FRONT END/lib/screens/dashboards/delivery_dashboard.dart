@@ -161,7 +161,7 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
     final locale = Provider.of<LocaleProvider>(context);
     final avatarUrl = auth.user?['avatarUrl'];
 
-    final assignedCount = _deliveries.where((d) => d['status'] == 'assigned').length;
+    final assignedCount = _deliveries.where((d) => d['status'] == 'assigned' || d['status'] == 'unassigned').length;
 
     final driverId = auth.user?['deliveryPersonId'];
 
@@ -377,19 +377,26 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [
-                                  if (status == 'assigned')
+                                  if (status == 'assigned' || status == 'unassigned')
                                     ElevatedButton.icon(
                                       onPressed: () => _updateStatus(del['id'], 'accepted'),
                                       icon: const Icon(Icons.check_circle_outline),
                                       label: Text(locale.isFrench ? 'Accepter la livraison' : 'Accept Delivery'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
                                     ),
-                                  if (status == 'accepted' || status == 'assigned')
+                                  if (status == 'accepted')
                                     ElevatedButton.icon(
                                       onPressed: () => _updateStatus(del['id'], 'picked_up'),
                                       icon: const Icon(Icons.local_shipping_outlined),
-                                      label: Text(locale.isFrench ? 'Colis récupéré' : 'Mark Picked Up'),
+                                      label: Text(locale.isFrench ? 'Colis récupéré à la ferme' : 'Mark Picked Up from Farm'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
+                                    ),
+                                  if (status == 'picked_up' || status == 'in_transit')
+                                    ElevatedButton.icon(
+                                      onPressed: () => _confirmSuccessfulDelivery(del['id']),
+                                      icon: const Icon(Icons.task_alt),
+                                      label: Text(locale.isFrench ? 'Confirmer livraison effectuée' : 'Confirm Successful Delivery'),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
                                     ),
                                   if (status != 'delivered')
                                     ElevatedButton.icon(
@@ -397,13 +404,6 @@ class _DeliveryDashboardState extends State<DeliveryDashboard> {
                                       icon: const Icon(Icons.warning_amber),
                                       label: Text(locale.isFrench ? 'Signaler retard' : 'Report Delay'),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800, foregroundColor: Colors.white),
-                                    ),
-                                  if (status != 'delivered')
-                                    ElevatedButton.icon(
-                                      onPressed: () => _confirmSuccessfulDelivery(del['id']),
-                                      icon: const Icon(Icons.task_alt),
-                                      label: Text(locale.isFrench ? 'Confirmer livraison effectuée' : 'Confirm Successful Delivery'),
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade800, foregroundColor: Colors.white),
                                     ),
                                 ],
                               ),

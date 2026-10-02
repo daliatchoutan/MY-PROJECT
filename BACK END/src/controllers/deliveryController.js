@@ -1,4 +1,5 @@
 const { Delivery, Order, User, Notification, OrderItem, Product, Farm } = require('../models');
+const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
 // Traceability helper include
@@ -192,16 +193,21 @@ const updateDeliveryStatus = async (req, res, next) => {
       return res.status(404).json({ message: 'Delivery record not found.' });
     }
 
-    if (req.user.role === 'Delivery Person' && delivery.deliveryPersonId !== req.user.id) {
-      return res.status(403).json({ message: 'Forbidden. This delivery is not assigned to you.' });
+    if (req.user.role === 'Delivery Person') {
+      if (delivery.deliveryPersonId && delivery.deliveryPersonId !== req.user.id) {
+        return res.status(403).json({ message: 'Forbidden. This delivery is not assigned to you.' });
+      }
+      // If delivery is unassigned, auto-assign to the accepting driver
+      if (!delivery.deliveryPersonId) {
+        delivery.deliveryPersonId = req.user.id;
+        delivery.assignedAt = new Date();
+      }
     }
 
     delivery.status = status;
-    if (status === 'delivered') {
-      delivery.deliveredAt = new Date();
-      delivery.confirmedAt = new Date();
+    if (status === 'accepted') {
       if (delivery.order) {
-        delivery.order.status = 'delivered';
+        delivery.order.status = 'accepted';
         await delivery.order.save();
       }
     } else if (status === 'picked_up') {
@@ -209,20 +215,49 @@ const updateDeliveryStatus = async (req, res, next) => {
         delivery.order.status = 'in_transit';
         await delivery.order.save();
       }
+    } else if (status === 'delivered') {
+      delivery.deliveredAt = new Date();
+      delivery.confirmedAt = new Date();
+      if (delivery.order) {
+        delivery.order.status = 'delivered';
+        await delivery.order.save();
+      }
     }
 
     await delivery.save();
 
     if (delivery.order && delivery.order.customerId) {
-      await Notification.create({
-        userId: delivery.order.customerId,
-        title: 'Delivery Update',
-        message: `Your package for order #${delivery.orderId.substring(0, 8)} status is now '${status}'.`,
-        type: 'delivery_update'
-      });
+      let notifTitle = 'Delivery Update';
+      let notifMsg = `Your package for order #${delivery.orderId.substring(0, 8)} status is now '${status}'.`;
+      if (status === 'accepted') {
+        notifTitle = 'Order Accepted by Courier 🛵';
+        notifMsg = `${req.user.name || 'Your courier'} has accepted order #${delivery.orderId.substring(0, 8)} and is heading to the farm!`;
+      } else if (status === 'picked_up') {
+        notifTitle = 'Order Picked Up 📦';
+        notifMsg = `Your order #${delivery.orderId.substring(0, 8)} has been picked up from the farm and is on the way!`;
+      } else if (status === 'delivered') {
+        notifTitle = 'Order Delivered! 🎉';
+        notifMsg = `Your order #${delivery.orderId.substring(0, 8)} has been delivered successfully.`;
+      }
+
+      try {
+        await Notification.create({
+          userId: delivery.order.customerId,
+          title: notifTitle,
+          message: notifMsg,
+          type: 'delivery_update'
+        });
+      } catch (notifErr) {
+        console.warn('Notice creating delivery status notification:', notifErr.message);
+      }
     }
 
-    return res.json({ message: 'Delivery status updated successfully', delivery });
+    // Reload with associations
+    const updatedDelivery = await Delivery.findByPk(delivery.id, {
+      include: deliveryTraceabilityInclude
+    });
+
+    return res.json({ message: 'Delivery status updated successfully', delivery: updatedDelivery || delivery });
   } catch (error) {
     next(error);
   }
@@ -311,7 +346,12 @@ const getMyDeliveries = async (req, res, next) => {
   try {
     let whereClause = {};
     if (req.user.role === 'Delivery Person') {
-      whereClause.deliveryPersonId = req.user.id;
+      whereClause = {
+        [Op.or]: [
+          { deliveryPersonId: req.user.id },
+          { deliveryPersonId: null, status: 'unassigned' }
+        ]
+      };
     }
 
     const deliveries = await Delivery.findAll({
